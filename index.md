@@ -12,6 +12,6 @@ I'm not injecting embryos or front of a computer screen, I'm probably lifting we
 ## Check out some of my latest work
 I write short pieces on current topics that capture my interest. I as learn programming and computational biology, I also post small projects. These projects may be tangental to my current research, but this work is my own. 
 
-[1D CNN for RNA Learning](./another-page.html)
+[1D CNN for RNA-Protein Interaction Motifs](./another-page.html)
 
 
