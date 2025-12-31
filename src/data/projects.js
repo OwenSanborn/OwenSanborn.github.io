@@ -1,0 +1,38 @@
+export const projects = [
+  {
+    id: 1,
+    title: "Portfolio Website",
+    description: "A modern, responsive portfolio website built with React and Tailwind CSS. Features smooth scrolling, mobile-friendly design, and easy content management.",
+    image: "/images/project-1.jpg",
+    technologies: ["React", "Tailwind CSS", "Vite"],
+    githubUrl: "https://github.com/yourusername/portfolio",
+    liveUrl: "https://yourusername.github.io",
+  },
+  {
+    id: 2,
+    title: "E-Commerce Platform",
+    description: "Full-stack e-commerce application with user authentication, product management, shopping cart, and payment integration.",
+    image: "/images/project-2.jpg",
+    technologies: ["React", "Node.js", "MongoDB", "Stripe"],
+    githubUrl: "https://github.com/yourusername/ecommerce",
+    liveUrl: "https://example.com",
+  },
+  {
+    id: 3,
+    title: "Task Management App",
+    description: "Collaborative task management tool with real-time updates, team collaboration features, and project tracking capabilities.",
+    image: "/images/project-3.jpg",
+    technologies: ["React", "Firebase", "Material-UI"],
+    githubUrl: "https://github.com/yourusername/taskmanager",
+    liveUrl: "https://example.com",
+  },
+  {
+    id: 4,
+    title: "Weather Dashboard",
+    description: "Interactive weather dashboard that displays current conditions and forecasts for multiple locations with beautiful data visualizations.",
+    image: "/images/project-4.jpg",
+    technologies: ["React", "API Integration", "Chart.js"],
+    githubUrl: "https://github.com/yourusername/weather",
+    liveUrl: "https://example.com",
+  },
+];

@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+@theme {
+  --color-charcoal: #1A1B26;
+  --color-slate: #3B3F51;
+  --color-warm-grey: #A8B2D1;
+  --color-ivory: #E6EDF3;
+  --color-steel-blue: #6B9BD1;
+  --color-warm-brown: #B8956A;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 70px;
+  }
+}
