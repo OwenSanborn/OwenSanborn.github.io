@@ -1,16 +1,16 @@
 {
   "files": {
-    "main.css": "/static/css/main.14a87f9d.css",
-    "main.js": "/static/js/main.97e3a77a.js",
-    "static/js/453.ab4c294f.chunk.js": "/static/js/453.ab4c294f.chunk.js",
-    "static/media/RBPscan_schematic.png": "/static/media/RBPscan_schematic.8f768203d80dbc4113e6.png",
-    "index.html": "/index.html",
-    "main.14a87f9d.css.map": "/static/css/main.14a87f9d.css.map",
-    "main.97e3a77a.js.map": "/static/js/main.97e3a77a.js.map",
-    "453.ab4c294f.chunk.js.map": "/static/js/453.ab4c294f.chunk.js.map"
+    "main.css": "/tools/rbpscan/static/css/main.14a87f9d.css",
+    "main.js": "/tools/rbpscan/static/js/main.682a017b.js",
+    "static/js/453.ab4c294f.chunk.js": "/tools/rbpscan/static/js/453.ab4c294f.chunk.js",
+    "static/media/RBPscan_schematic.png": "/tools/rbpscan/static/media/RBPscan_schematic.8f768203d80dbc4113e6.png",
+    "index.html": "/tools/rbpscan/index.html",
+    "main.14a87f9d.css.map": "/tools/rbpscan/static/css/main.14a87f9d.css.map",
+    "main.682a017b.js.map": "/tools/rbpscan/static/js/main.682a017b.js.map",
+    "453.ab4c294f.chunk.js.map": "/tools/rbpscan/static/js/453.ab4c294f.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.14a87f9d.css",
-    "static/js/main.97e3a77a.js"
+    "static/js/main.682a017b.js"
   ]
 }
