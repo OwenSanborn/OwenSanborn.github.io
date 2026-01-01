@@ -3,6 +3,7 @@ import Hero from './components/sections/Hero';
 import Experience from './components/sections/Experience';
 import Publications from './components/sections/Publications';
 import Posts from './components/sections/Posts';
+import Tools from './components/sections/Tools';
 import Contact from './components/sections/Contact';
 
 function App() {
@@ -10,6 +11,7 @@ function App() {
     <Layout>
       <Hero />
       <Posts />
+      <Tools />
       <Experience />
       <Publications />
       <Contact />
