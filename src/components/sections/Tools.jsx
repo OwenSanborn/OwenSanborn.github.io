@@ -4,7 +4,7 @@ const Tools = () => {
       id: 1,
       name: "RBPscan Analysis",
       description: "A quantitative, in vivo tool for profiling RNA-binding protein interactions. Upload your data and analyze RBP binding patterns with interactive visualizations.",
-      link: "/tools/rbpscan/index.html",
+      link: "/tools/rbpscan/",
       external: false,
     },
   ];
