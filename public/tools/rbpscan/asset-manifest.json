@@ -1,16 +1,14 @@
 {
   "files": {
-    "main.css": "/tools/rbpscan/static/css/main.14a87f9d.css",
-    "main.js": "/tools/rbpscan/static/js/main.f4ead886.js",
-    "static/js/453.ab4c294f.chunk.js": "/tools/rbpscan/static/js/453.ab4c294f.chunk.js",
+    "main.css": "/tools/rbpscan/static/css/main.972acf95.css",
+    "main.js": "/tools/rbpscan/static/js/main.88f47765.js",
+    "static/js/206.18bb4e2f.chunk.js": "/tools/rbpscan/static/js/206.18bb4e2f.chunk.js",
     "static/media/RBPscan_schematic.png": "/tools/rbpscan/static/media/RBPscan_schematic.8f768203d80dbc4113e6.png",
-    "index.html": "/tools/rbpscan/index.html",
-    "main.14a87f9d.css.map": "/tools/rbpscan/static/css/main.14a87f9d.css.map",
-    "main.f4ead886.js.map": "/tools/rbpscan/static/js/main.f4ead886.js.map",
-    "453.ab4c294f.chunk.js.map": "/tools/rbpscan/static/js/453.ab4c294f.chunk.js.map"
+    "static/media/index.cjs": "/tools/rbpscan/static/media/index.6f2d0165b90a35301fab.cjs",
+    "index.html": "/tools/rbpscan/index.html"
   },
   "entrypoints": [
-    "static/css/main.14a87f9d.css",
-    "static/js/main.f4ead886.js"
+    "static/css/main.972acf95.css",
+    "static/js/main.88f47765.js"
   ]
 }
