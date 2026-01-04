@@ -11,7 +11,7 @@ const Tools = () => {
       id: 2,
       name: "Sanger Analysis",
       description: "Browser-based Sanger sequencing analysis tool. Upload .ab1 files to analyze RNA editing patterns with statistical modeling - all processed locally in your browser.",
-      link: "/tools/rbpscan/Analysis",
+      link: "/tools/SangerAnalysis",
       external: false,
     },
   ];
