@@ -2,7 +2,7 @@ import { publications } from '../../data/publications';
 
 const Publications = () => {
   return (
-    <section id="publications" className="py-24 bg-slate bg-opacity-20">
+    <section id="publications" className="py-24 bg-charcoal">
       <div className="container mx-auto px-6">
         <h2 className="text-4xl font-light text-ivory mb-16 tracking-tight">
           Publications
