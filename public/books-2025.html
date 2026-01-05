@@ -81,11 +81,70 @@
             color: #E6EDF3;
             font-weight: 500;
         }
+
+        /* Navigation Header Styles */
+        nav {
+            background-color: rgba(26, 27, 38, 0.95);
+            backdrop-filter: blur(4px);
+            border-bottom: 1px solid rgba(71, 85, 105, 0.2);
+            padding: 1rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        nav .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        nav .logo {
+            font-size: 1.25rem;
+            font-weight: 300;
+            color: #E6EDF3;
+            text-decoration: none;
+            letter-spacing: -0.025em;
+        }
+
+        nav .nav-links {
+            display: flex;
+            gap: 2rem;
+        }
+
+        nav a {
+            color: #A8B2D1;
+            text-decoration: none;
+            font-size: 0.875rem;
+            font-weight: 300;
+            letter-spacing: 0.025em;
+            transition: color 0.3s;
+        }
+
+        nav a:hover {
+            color: #E6EDF3;
+        }
     </style>
 </head>
 <body>
+    <!-- Navigation Header -->
+    <nav>
+        <div class="nav-container">
+            <a href="/" class="logo">OS</a>
+            <div class="nav-links">
+                <a href="/#home">Home</a>
+                <a href="/#posts">Posts</a>
+                <a href="/#experience">Experience</a>
+                <a href="/#publications">Publications</a>
+                <a href="/#contact">Contact</a>
+            </div>
+        </div>
+    </nav>
+
     <div class="container">
-        <a href="/" class="back-link">← Back to home</a>
 
         <header>
             <h1>Books 2025</h1>
