@@ -41,8 +41,10 @@ const reverseComplement = (seq) => {
 };
 
 // Hairpin patterns for validation
-const FWD_HAIRPIN_PATTERN = /(?<=AAATT)TT[AG]G[AG]TT[AG]G[AG]TT[AG]G[AG]TT[AG]G[AG]TT[AG]G[AG]TT[AG]G[AG]/;
-const REV_HAIRPIN_PATTERN = /AA[TC]C[TC]AA[TC]C[TC]AA[TC]C[TC]AA[TC]C[TC]AA[TC]C[TC]AA[TC]C[TC](?=AATTT)/;
+// Forward: TTAGA repeating (after CCAATTAAA anchor)
+const FWD_HAIRPIN_PATTERN = /TTAG[AG]TTAG[AG]TTAG[AG]TTAG[AG]TTAG[AG]TTAG[AG]/;
+// Reverse: TCTAA repeating (complement of TTAGA, before TTTAATTGG which is rev comp of anchor)
+const REV_HAIRPIN_PATTERN = /[TC]CTAA[TC]CTAA[TC]CTAA[TC]CTAA[TC]CTAA[TC]CTAA/;
 
 const WebRAnalysis = () => {
   const [files, setFiles] = useState([]);
