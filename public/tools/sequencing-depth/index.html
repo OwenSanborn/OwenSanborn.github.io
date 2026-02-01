@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sequencing Depth Analyzer | Owen Sanborn</title>
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1A1B26;
+            color: #E6EDF3;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        /* Navigation */
+        .topnav {
+            background-color: #1A1B26;
+            border-bottom: 1px solid rgba(107, 155, 209, 0.2);
+            padding: 0 24px;
+            display: flex;
+            align-items: center;
+        }
+        .topnav a {
+            display: inline-block;
+            color: #A8B2D1;
+            text-align: center;
+            padding: 16px 20px;
+            text-decoration: none;
+            font-size: 15px;
+            font-weight: 300;
+            transition: color 0.2s;
+        }
+        .topnav a:hover {
+            color: #E6EDF3;
+        }
+        .topnav a.brand {
+            color: #E6EDF3;
+            font-weight: 400;
+            margin-right: 20px;
+        }
+        .topnav a.active {
+            color: #6B9BD1;
+        }
+
+        /* Main content */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 60px 24px;
+        }
+
+        h1 {
+            color: #E6EDF3;
+            font-size: 2.5rem;
+            margin-bottom: 12px;
+            font-weight: 300;
+            letter-spacing: -0.5px;
+        }
+
+        .subtitle {
+            color: #A8B2D1;
+            margin-bottom: 40px;
+            font-size: 1.1rem;
+            font-weight: 300;
+        }
+
+        .note {
+            color: #6B9BD1;
+            font-size: 0.9rem;
+            margin-bottom: 30px;
+            font-weight: 300;
+        }
+
+        .drop-zone {
+            border: 1px dashed rgba(107, 155, 209, 0.4);
+            border-radius: 8px;
+            padding: 60px 40px;
+            text-align: center;
+            background: rgba(59, 63, 81, 0.2);
+            margin-bottom: 30px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: #6B9BD1;
+            background: rgba(107, 155, 209, 0.1);
+        }
+        .drop-zone p {
+            font-size: 1.1rem;
+            color: #E6EDF3;
+            margin-bottom: 8px;
+            font-weight: 300;
+        }
+        .drop-zone small {
+            color: #A8B2D1;
+            font-weight: 300;
+        }
+
+        .settings {
+            background: rgba(59, 63, 81, 0.3);
+            padding: 20px 24px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            display: flex;
+            gap: 30px;
+            align-items: center;
+            flex-wrap: wrap;
+            border: 1px solid rgba(107, 155, 209, 0.15);
+        }
+        .settings label {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: #A8B2D1;
+            font-size: 0.95rem;
+            font-weight: 300;
+        }
+        .settings input[type="number"] {
+            width: 70px;
+            padding: 10px 12px;
+            border: 1px solid rgba(107, 155, 209, 0.3);
+            border-radius: 4px;
+            font-size: 0.95rem;
+            background: #1A1B26;
+            color: #E6EDF3;
+        }
+        .settings input[type="number"]:focus {
+            outline: none;
+            border-color: #6B9BD1;
+        }
+
+        .btn {
+            background: transparent;
+            color: #6B9BD1;
+            border: 1px solid rgba(107, 155, 209, 0.4);
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 300;
+            transition: all 0.2s;
+        }
+        .btn:hover {
+            background: rgba(107, 155, 209, 0.1);
+            border-color: #6B9BD1;
+        }
+
+        .sample-list {
+            background: rgba(59, 63, 81, 0.3);
+            padding: 24px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(107, 155, 209, 0.15);
+        }
+        .sample-list h3 {
+            margin-bottom: 16px;
+            color: #E6EDF3;
+            font-size: 1.1rem;
+            font-weight: 400;
+        }
+        .sample-item {
+            display: flex;
+            align-items: center;
+            padding: 14px 0;
+            border-bottom: 1px solid rgba(107, 155, 209, 0.1);
+            gap: 16px;
+        }
+        .sample-item:last-child {
+            border-bottom: none;
+        }
+        .sample-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+            flex-shrink: 0;
+        }
+        .sample-name {
+            flex: 1;
+            font-weight: 400;
+            color: #E6EDF3;
+        }
+        .sample-stats {
+            color: #A8B2D1;
+            font-size: 0.9rem;
+            font-weight: 300;
+        }
+        .sample-remove {
+            background: transparent;
+            color: #B8956A;
+            border: 1px solid rgba(184, 149, 106, 0.4);
+            padding: 6px 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 300;
+            transition: all 0.2s;
+        }
+        .sample-remove:hover {
+            background: rgba(184, 149, 106, 0.15);
+            border-color: #B8956A;
+        }
+
+        .charts-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 30px;
+        }
+        .chart-box {
+            background: rgba(59, 63, 81, 0.3);
+            padding: 24px;
+            border-radius: 8px;
+            border: 1px solid rgba(107, 155, 209, 0.15);
+        }
+        .chart-box h3 {
+            margin-bottom: 16px;
+            color: #E6EDF3;
+            font-size: 1rem;
+            font-weight: 400;
+        }
+        .chart-wrapper {
+            position: relative;
+            height: 280px;
+        }
+
+        .stats-table {
+            background: rgba(59, 63, 81, 0.3);
+            padding: 24px;
+            border-radius: 8px;
+            overflow-x: auto;
+            border: 1px solid rgba(107, 155, 209, 0.15);
+        }
+        .stats-table h3 {
+            margin-bottom: 16px;
+            color: #E6EDF3;
+            font-size: 1.1rem;
+            font-weight: 400;
+        }
+        .stats-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .stats-table th, .stats-table td {
+            padding: 14px 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(107, 155, 209, 0.1);
+        }
+        .stats-table th {
+            background: rgba(59, 63, 81, 0.5);
+            font-weight: 400;
+            color: #E6EDF3;
+            font-size: 0.9rem;
+        }
+        .stats-table td {
+            font-size: 0.9rem;
+            color: #A8B2D1;
+            font-weight: 300;
+        }
+        .stats-table td strong {
+            color: #E6EDF3;
+            font-weight: 400;
+        }
+
+        .progress-container {
+            background: rgba(59, 63, 81, 0.3);
+            padding: 24px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            display: none;
+            border: 1px solid rgba(107, 155, 209, 0.15);
+        }
+        .progress-bar {
+            height: 8px;
+            background: rgba(59, 63, 81, 0.5);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #6B9BD1;
+            transition: width 0.3s;
+        }
+        .progress-text {
+            margin-top: 12px;
+            color: #A8B2D1;
+            font-size: 0.9rem;
+            font-weight: 300;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 40px 24px;
+            color: #A8B2D1;
+            font-size: 0.9rem;
+            font-weight: 300;
+            border-top: 1px solid rgba(107, 155, 209, 0.1);
+            margin-top: 60px;
+        }
+        .footer a {
+            color: #6B9BD1;
+            text-decoration: none;
+        }
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 800px) {
+            .charts-container {
+                grid-template-columns: 1fr;
+            }
+            .settings {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="topnav">
+        <a href="/" class="brand">Owen Sanborn</a>
+        <a href="/#about">About</a>
+        <a href="/#publications">Publications</a>
+        <a href="/#tools" class="active">Tools</a>
+        <a href="/#contact">Contact</a>
+    </nav>
+
+    <div class="container">
+        <h1>Sequencing Depth Analyzer</h1>
+        <p class="subtitle">Analyze FASTQ.gz files to evaluate sequencing depth and compare samples</p>
+        <p class="note">Note: Large files (>100MB) may take a while to process in the browser.</p>
+
+        <div class="drop-zone" id="dropZone">
+            <p>Drop FASTQ.gz files here</p>
+            <small>or click to select files</small>
+            <input type="file" id="fileInput" multiple accept=".gz,.fastq,.fq" style="display: none;">
+        </div>
+
+        <div class="settings">
+            <label>
+                Trim left (bp):
+                <input type="number" id="trimLeft" value="10" min="0">
+            </label>
+            <label>
+                Trim right (bp):
+                <input type="number" id="trimRight" value="10" min="0">
+            </label>
+            <button class="btn" onclick="clearAll()">Clear All</button>
+        </div>
+
+        <div class="progress-container" id="progressContainer">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+            </div>
+            <div class="progress-text" id="progressText">Processing...</div>
+        </div>
+
+        <div class="sample-list" id="sampleList" style="display: none;">
+            <h3>Loaded Samples</h3>
+            <div id="sampleItems"></div>
+        </div>
+
+        <div class="charts-container">
+            <div class="chart-box">
+                <h3>Coverage Distribution (capped at 99th percentile)</h3>
+                <div class="chart-wrapper">
+                    <canvas id="coverageChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-box">
+                <h3>Coverage Distribution (log scale)</h3>
+                <div class="chart-wrapper">
+                    <canvas id="coverageLogChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-box">
+                <h3>Cumulative Read Depth Distribution</h3>
+                <div class="chart-wrapper">
+                    <canvas id="cumulativeChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-box">
+                <h3>Saturation Plot (Unique Sequence Discovery)</h3>
+                <div class="chart-wrapper">
+                    <canvas id="saturationChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-table" id="statsTable" style="display: none;">
+            <h3>Summary Statistics</h3>
+            <table id="statsTableContent">
+                <thead>
+                    <tr>
+                        <th>Sample</th>
+                        <th>Total Reads</th>
+                        <th>Unique Sequences</th>
+                        <th>Mean</th>
+                        <th>Median</th>
+                        <th>≥10 reads</th>
+                        <th>≥50 reads</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <a href="/">← Back to owensanborn.github.io</a>
+    </footer>
+
+    <script>
+        const colors = [
+            'rgba(107, 155, 209, 0.7)',  // steel-blue
+            'rgba(184, 149, 106, 0.7)',  // warm-brown
+            'rgba(60, 179, 113, 0.7)',   // seagreen
+            'rgba(168, 178, 209, 0.7)',  // warm-grey
+            'rgba(255, 193, 7, 0.7)',    // amber
+            'rgba(156, 39, 176, 0.7)',   // purple
+        ];
+
+        // Chart.js dark theme defaults
+        Chart.defaults.color = '#A8B2D1';
+        Chart.defaults.borderColor = 'rgba(107, 155, 209, 0.15)';
+
+        let samples = [];
+        let charts = {};
+
+        function initCharts() {
+            const commonOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            color: '#A8B2D1',
+                            font: { weight: 300 }
+                        }
+                    }
+                }
+            };
+
+            charts.coverage = new Chart(document.getElementById('coverageChart'), {
+                type: 'bar',
+                data: { labels: [], datasets: [] },
+                options: {
+                    ...commonOptions,
+                    scales: {
+                        x: {
+                            title: { display: true, text: 'Read Count per Unique Sequence', color: '#A8B2D1' },
+                            ticks: { color: '#A8B2D1' },
+                            grid: { color: 'rgba(107, 155, 209, 0.1)' }
+                        },
+                        y: {
+                            title: { display: true, text: 'Number of Sequences', color: '#A8B2D1' },
+                            ticks: { color: '#A8B2D1' },
+                            grid: { color: 'rgba(107, 155, 209, 0.1)' }
+                        }
+                    }
+                }
+            });
+
+            charts.coverageLog = new Chart(document.getElementById('coverageLogChart'), {
+                type: 'bar',
+                data: { labels: [], datasets: [] },
+                options: {
+                    ...commonOptions,
+                    scales: {
+                        x: {
+                            type: 'logarithmic',
+                            title: { display: true, text: 'Read Count (log scale)', color: '#A8B2D1' },
+                            ticks: { color: '#A8B2D1' },
+                            grid: { color: 'rgba(107, 155, 209, 0.1)' }
+                        },
+                        y: {
+                            title: { display: true, text: 'Number of Sequences', color: '#A8B2D1' },
+                            ticks: { color: '#A8B2D1' },
+                            grid: { color: 'rgba(107, 155, 209, 0.1)' }
+                        }
+                    }
+                }
+            });
+
+            charts.cumulative = new Chart(document.getElementById('cumulativeChart'), {
+                type: 'scatter',
+                data: { datasets: [] },
+                options: {
+                    ...commonOptions,
+                    showLine: true,
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            min: 0,
+                            max: 100,
+                            title: { display: true, text: 'Cumulative % of Sequences (ranked)', color: '#A8B2D1' },
+                            ticks: { color: '#A8B2D1' },
+                            grid: { color: 'rgba(107, 155, 209, 0.1)' }
+                        },
+                        y: {
+                            type: 'linear',
+                            min: 0,
+                            max: 100,
+                            title: { display: true, text: 'Cumulative % of Reads', color: '#A8B2D1' },
+                            ticks: { color: '#A8B2D1' },
+                            grid: { color: 'rgba(107, 155, 209, 0.1)' }
+                        }
+                    }
+                }
+            });
+
+            charts.saturation = new Chart(document.getElementById('saturationChart'), {
+                type: 'scatter',
+                data: { datasets: [] },
+                options: {
+                    ...commonOptions,
+                    showLine: true,
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            title: { display: true, text: 'Number of Reads (millions)', color: '#A8B2D1' },
+                            ticks: { color: '#A8B2D1' },
+                            grid: { color: 'rgba(107, 155, 209, 0.1)' }
+                        },
+                        y: {
+                            type: 'linear',
+                            title: { display: true, text: 'Unique Sequences Detected', color: '#A8B2D1' },
+                            ticks: { color: '#A8B2D1' },
+                            grid: { color: 'rgba(107, 155, 209, 0.1)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        });
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+
+        async function handleFiles(files) {
+            for (const file of files) {
+                await processFile(file);
+            }
+        }
+
+        async function processFile(file) {
+            const progressContainer = document.getElementById('progressContainer');
+            const progressFill = document.getElementById('progressFill');
+            const progressText = document.getElementById('progressText');
+
+            progressContainer.style.display = 'block';
+            progressFill.style.width = '0%';
+
+            const fileSizeMB = (file.size / 1024 / 1024).toFixed(1);
+            progressText.textContent = `Reading ${file.name} (${fileSizeMB} MB)...`;
+
+            try {
+                const trimLeft = parseInt(document.getElementById('trimLeft').value) || 0;
+                const trimRight = parseInt(document.getElementById('trimRight').value) || 0;
+
+                let result;
+
+                if (file.name.endsWith('.gz')) {
+                    progressText.textContent = `Processing ${file.name}...`;
+                    progressFill.style.width = '10%';
+
+                    result = await processGzipFileStreaming(file, trimLeft, trimRight, (progress, reads) => {
+                        progressFill.style.width = (10 + progress * 80) + '%';
+                        progressText.textContent = `Processing... ${(reads/1000000).toFixed(2)}M reads`;
+                    });
+                } else {
+                    const text = await file.text();
+                    progressText.textContent = `Processing ${file.name}...`;
+                    progressFill.style.width = '40%';
+
+                    result = await processFastqAsync(text, trimLeft, trimRight, (progress, reads) => {
+                        progressFill.style.width = (40 + progress * 50) + '%';
+                        progressText.textContent = `Processing... ${(reads/1000000).toFixed(2)}M reads`;
+                    });
+                }
+
+                progressText.textContent = `Calculating statistics...`;
+                progressFill.style.width = '90%';
+
+                const sampleName = file.name.replace(/\.f(ast)?q(\.gz)?$/i, '').replace(/^CoopMPRA_6hpf_/, '').replace(/_CKDL.*$/, '');
+
+                samples.push({
+                    name: sampleName,
+                    ...result,
+                    color: colors[samples.length % colors.length]
+                });
+
+                updateUI();
+                progressFill.style.width = '100%';
+                progressText.textContent = `Done processing ${file.name}`;
+
+                setTimeout(() => {
+                    progressContainer.style.display = 'none';
+                }, 1000);
+
+            } catch (error) {
+                console.error('Error processing file:', error);
+                progressText.textContent = `Error: ${error.message}`;
+            }
+        }
+
+        function getBgzipBlockSize(data, offset) {
+            if (data[offset] !== 0x1f || data[offset + 1] !== 0x8b) {
+                return -1;
+            }
+            const flags = data[offset + 3];
+            if (!(flags & 0x04)) {
+                return -1;
+            }
+            const xlen = data[offset + 10] | (data[offset + 11] << 8);
+            let pos = offset + 12;
+            const extraEnd = pos + xlen;
+            while (pos + 4 <= extraEnd) {
+                const si1 = data[pos];
+                const si2 = data[pos + 1];
+                const slen = data[pos + 2] | (data[pos + 3] << 8);
+                if (si1 === 0x42 && si2 === 0x43 && slen === 2) {
+                    const bsize = (data[pos + 4] | (data[pos + 5] << 8)) + 1;
+                    return bsize;
+                }
+                pos += 4 + slen;
+            }
+            return -1;
+        }
+
+        async function processGzipFileStreaming(file, trimLeft, trimRight, onProgress) {
+            if (typeof pako === 'undefined') {
+                throw new Error('pako library not loaded.');
+            }
+
+            const arrayBuffer = await file.arrayBuffer();
+            const compressed = new Uint8Array(arrayBuffer);
+
+            onProgress(0.05, 0);
+            await new Promise(resolve => setTimeout(resolve, 10));
+
+            const firstBlockSize = getBgzipBlockSize(compressed, 0);
+            const isBgzip = firstBlockSize > 0;
+
+            const sequenceCounts = new Map();
+            let totalReads = 0;
+            let buffer = '';
+            let lineCount = 0;
+            let skippedShort = 0;
+
+            try {
+                let offset = 0;
+                let memberCount = 0;
+
+                while (offset < compressed.length) {
+                    if (compressed[offset] !== 0x1f || compressed[offset + 1] !== 0x8b) {
+                        break;
+                    }
+
+                    memberCount++;
+
+                    let blockSize;
+                    if (isBgzip) {
+                        blockSize = getBgzipBlockSize(compressed, offset);
+                        if (blockSize <= 0) {
+                            break;
+                        }
+                    }
+
+                    const blockEnd = isBgzip ? offset + blockSize : compressed.length;
+                    const block = compressed.subarray(offset, blockEnd);
+
+                    let decompressed;
+                    try {
+                        decompressed = pako.inflate(block);
+                    } catch (e) {
+                        if (!isBgzip && memberCount === 1) {
+                            decompressed = pako.inflate(compressed);
+                        } else {
+                            throw e;
+                        }
+                    }
+
+                    const chunkText = new TextDecoder().decode(decompressed);
+                    buffer += chunkText;
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop();
+
+                    for (const line of lines) {
+                        lineCount++;
+                        if (lineCount % 4 === 2) {
+                            let seq = line.trim();
+                            if (seq.length >= trimLeft + trimRight + 30) {
+                                if (trimRight > 0) {
+                                    seq = seq.slice(trimLeft, -trimRight);
+                                } else {
+                                    seq = seq.slice(trimLeft);
+                                }
+                                sequenceCounts.set(seq, (sequenceCounts.get(seq) || 0) + 1);
+                                totalReads++;
+                            } else if (seq.length > 0) {
+                                skippedShort++;
+                            }
+                        }
+                    }
+
+                    if (isBgzip) {
+                        offset += blockSize;
+                    } else {
+                        offset = compressed.length;
+                    }
+
+                    if (memberCount % 500 === 0 || memberCount === 1) {
+                        onProgress(offset / compressed.length * 0.9, totalReads);
+                        await new Promise(resolve => setTimeout(resolve, 0));
+                    }
+                }
+
+                if (buffer.length > 0) {
+                    const lines = buffer.split('\n');
+                    for (const line of lines) {
+                        lineCount++;
+                        if (lineCount % 4 === 2) {
+                            let seq = line.trim();
+                            if (seq.length >= trimLeft + trimRight + 30) {
+                                if (trimRight > 0) {
+                                    seq = seq.slice(trimLeft, -trimRight);
+                                } else {
+                                    seq = seq.slice(trimLeft);
+                                }
+                                sequenceCounts.set(seq, (sequenceCounts.get(seq) || 0) + 1);
+                                totalReads++;
+                            }
+                        }
+                    }
+                }
+
+            } catch (e) {
+                throw new Error('Decompression failed: ' + e.message);
+            }
+
+            if (totalReads === 0) {
+                throw new Error('No valid reads found. Check file format and trim settings.');
+            }
+
+            return computeStatistics(sequenceCounts, totalReads);
+        }
+
+        async function processFastqAsync(text, trimLeft, trimRight, onProgress) {
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    const result = processFastq(text, trimLeft, trimRight, onProgress);
+                    resolve(result);
+                }, 50);
+            });
+        }
+
+        function computeStatistics(sequenceCounts, totalReads) {
+            const counts = Array.from(sequenceCounts.values());
+            counts.sort((a, b) => a - b);
+
+            if (counts.length === 0) {
+                return {
+                    totalReads: 0,
+                    uniqueSequences: 0,
+                    mean: 0,
+                    median: 0,
+                    min: 0,
+                    max: 0,
+                    gte10: 0,
+                    gte50: 0,
+                    histogramData: { labels: [], values: [] },
+                    logHistogramData: { labels: [], values: [] },
+                    cumulativeData: [],
+                    saturationData: []
+                };
+            }
+
+            const sum = counts.reduce((a, b) => a + b, 0);
+            const mean = sum / counts.length;
+            const median = counts[Math.floor(counts.length / 2)];
+            const min = counts[0];
+            const max = counts[counts.length - 1];
+
+            const gte10 = counts.filter(c => c >= 10).length;
+            const gte50 = counts.filter(c => c >= 50).length;
+
+            const p99 = counts[Math.floor(counts.length * 0.99)];
+            const histogramData = createHistogram(counts.filter(c => c <= p99), 50);
+            const logHistogramData = createLogHistogram(counts, 30);
+
+            const sortedDesc = [...counts].sort((a, b) => b - a);
+            const cumsum = [];
+            let runningSum = 0;
+            for (const c of sortedDesc) {
+                runningSum += c;
+                cumsum.push(runningSum);
+            }
+            const totalSum = runningSum;
+            const cumulativeData = [];
+            for (let i = 0; i < cumsum.length; i += Math.max(1, Math.floor(cumsum.length / 100))) {
+                cumulativeData.push({
+                    x: ((i + 1) / cumsum.length) * 100,
+                    y: (cumsum[i] / totalSum) * 100
+                });
+            }
+
+            const saturationData = calculateSaturation(sequenceCounts, totalReads);
+
+            return {
+                totalReads,
+                uniqueSequences: sequenceCounts.size,
+                mean,
+                median,
+                min,
+                max,
+                gte10,
+                gte50,
+                histogramData,
+                logHistogramData,
+                cumulativeData,
+                saturationData
+            };
+        }
+
+        function processFastq(text, trimLeft, trimRight, onProgress) {
+            const lines = text.split('\n');
+            const sequenceCounts = new Map();
+            let totalReads = 0;
+            const totalLines = lines.length;
+
+            for (let i = 0; i < lines.length; i += 4) {
+                if (i + 1 >= lines.length) break;
+
+                let seq = lines[i + 1].trim();
+                if (seq.length >= trimLeft + trimRight + 30) {
+                    if (trimRight > 0) {
+                        seq = seq.slice(trimLeft, -trimRight);
+                    } else {
+                        seq = seq.slice(trimLeft);
+                    }
+                    sequenceCounts.set(seq, (sequenceCounts.get(seq) || 0) + 1);
+                    totalReads++;
+                }
+
+                if (totalReads % 100000 === 0) {
+                    onProgress(i / totalLines);
+                }
+            }
+
+            return computeStatistics(sequenceCounts, totalReads);
+        }
+
+        function createHistogram(data, bins) {
+            let min = data[0], max = data[0];
+            for (const v of data) {
+                if (v < min) min = v;
+                if (v > max) max = v;
+            }
+            const binWidth = (max - min) / bins || 1;
+            const histogram = new Array(bins).fill(0);
+            const labels = [];
+
+            for (let i = 0; i < bins; i++) {
+                labels.push(Math.round(min + (i + 0.5) * binWidth));
+            }
+
+            for (const value of data) {
+                const binIndex = Math.min(Math.floor((value - min) / binWidth), bins - 1);
+                histogram[binIndex]++;
+            }
+
+            return { labels, values: histogram };
+        }
+
+        function createLogHistogram(data, bins) {
+            let max = data[0];
+            for (const v of data) {
+                if (v > max) max = v;
+            }
+            const logMin = 0;
+            const logMax = Math.log10(max + 1);
+            const binWidth = (logMax - logMin) / bins || 1;
+            const histogram = new Array(bins).fill(0);
+            const labels = [];
+
+            for (let i = 0; i < bins; i++) {
+                labels.push(Math.round(Math.pow(10, logMin + (i + 0.5) * binWidth)));
+            }
+
+            for (const value of data) {
+                const logValue = Math.log10(value + 1);
+                const binIndex = Math.min(Math.floor((logValue - logMin) / binWidth), bins - 1);
+                histogram[binIndex]++;
+            }
+
+            return { labels, values: histogram };
+        }
+
+        function calculateSaturation(sequenceCounts, totalReads) {
+            const counts = Array.from(sequenceCounts.values());
+            const fractions = [0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
+            const data = [];
+
+            for (const frac of fractions) {
+                let expectedUnique = 0;
+                for (const c of counts) {
+                    const pSeen = 1 - Math.exp(-c * frac);
+                    expectedUnique += pSeen;
+                }
+
+                data.push({
+                    x: (totalReads * frac) / 1000000,
+                    y: Math.round(expectedUnique)
+                });
+            }
+
+            return data;
+        }
+
+        function updateUI() {
+            const sampleList = document.getElementById('sampleList');
+            const sampleItems = document.getElementById('sampleItems');
+            sampleList.style.display = samples.length > 0 ? 'block' : 'none';
+
+            sampleItems.innerHTML = samples.map((s, i) => `
+                <div class="sample-item">
+                    <div class="sample-color" style="background: ${s.color}"></div>
+                    <div class="sample-name">${s.name}</div>
+                    <div class="sample-stats">${(s.totalReads/1e6).toFixed(2)}M reads, ${(s.uniqueSequences/1e6).toFixed(2)}M unique</div>
+                    <button class="sample-remove" onclick="removeSample(${i})">Remove</button>
+                </div>
+            `).join('');
+
+            updateCharts();
+            updateStatsTable();
+        }
+
+        function updateCharts() {
+            if (samples.length > 0) {
+                charts.coverage.data.labels = samples[0].histogramData.labels;
+                charts.coverage.data.datasets = samples.map((s, i) => ({
+                    label: s.name,
+                    data: s.histogramData.values,
+                    backgroundColor: s.color,
+                    borderWidth: 0
+                }));
+                charts.coverage.update();
+
+                charts.coverageLog.data.labels = samples[0].logHistogramData.labels;
+                charts.coverageLog.data.datasets = samples.map((s, i) => ({
+                    label: s.name,
+                    data: s.logHistogramData.values,
+                    backgroundColor: s.color,
+                    borderWidth: 0
+                }));
+                charts.coverageLog.update();
+
+                charts.cumulative.data.datasets = samples.map((s, i) => ({
+                    label: s.name,
+                    data: s.cumulativeData,
+                    borderColor: s.color.replace('0.7', '1'),
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    showLine: true
+                }));
+                charts.cumulative.update();
+
+                charts.saturation.data.datasets = samples.map((s, i) => ({
+                    label: `${s.name} (${(s.uniqueSequences/1e6).toFixed(2)}M)`,
+                    data: s.saturationData,
+                    borderColor: s.color.replace('0.7', '1'),
+                    backgroundColor: s.color,
+                    borderWidth: 2,
+                    pointRadius: 4,
+                    showLine: true
+                }));
+                charts.saturation.update();
+            }
+        }
+
+        function updateStatsTable() {
+            const table = document.getElementById('statsTable');
+            const tbody = document.querySelector('#statsTableContent tbody');
+
+            table.style.display = samples.length > 0 ? 'block' : 'none';
+
+            tbody.innerHTML = samples.map(s => `
+                <tr>
+                    <td><strong>${s.name}</strong></td>
+                    <td>${s.totalReads.toLocaleString()}</td>
+                    <td>${s.uniqueSequences.toLocaleString()}</td>
+                    <td>${s.mean.toFixed(2)}</td>
+                    <td>${s.median.toFixed(0)}</td>
+                    <td>${s.gte10.toLocaleString()} (${(100*s.gte10/s.uniqueSequences).toFixed(1)}%)</td>
+                    <td>${s.gte50.toLocaleString()} (${(100*s.gte50/s.uniqueSequences).toFixed(1)}%)</td>
+                </tr>
+            `).join('');
+        }
+
+        function removeSample(index) {
+            samples.splice(index, 1);
+            updateUI();
+        }
+
+        function clearAll() {
+            samples = [];
+            updateUI();
+        }
+
+        initCharts();
+    </script>
+</body>
+</html>

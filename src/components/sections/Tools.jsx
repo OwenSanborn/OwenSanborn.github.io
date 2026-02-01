@@ -14,6 +14,13 @@ const Tools = () => {
       link: "/tools/SangerAnalysis",
       external: false,
     },
+    {
+      id: 3,
+      name: "Sequencing Depth Analyzer",
+      description: "Evaluate sequencing depth from FASTQ.gz files. Generate coverage distribution plots, cumulative depth plots, and saturation curves to compare samples - all processed locally in your browser.",
+      link: "/tools/sequencing-depth/",
+      external: false,
+    },
   ];
 
   return (
