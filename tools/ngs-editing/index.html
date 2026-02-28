@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RBPscan NGS Editing Analyzer | Owen Sanborn</title>
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1A1B26; color: #E6EDF3; line-height: 1.6; min-height: 100vh;
+        }
+        .topnav {
+            background: #1A1B26; border-bottom: 1px solid rgba(107,155,209,0.2);
+            padding: 0 24px; display: flex; align-items: center;
+        }
+        .topnav a {
+            display: inline-block; color: #A8B2D1; padding: 16px 20px;
+            text-decoration: none; font-size: 15px; font-weight: 300; transition: color 0.2s;
+        }
+        .topnav a:hover { color: #E6EDF3; }
+        .topnav a.brand { color: #E6EDF3; font-weight: 400; margin-right: 20px; }
+        .topnav a.active { color: #6B9BD1; }
+
+        .container { max-width: 1300px; margin: 0 auto; padding: 60px 24px; }
+        h1 { color: #E6EDF3; font-size: 2.5rem; margin-bottom: 12px; font-weight: 300; letter-spacing: -0.5px; }
+        .subtitle { color: #A8B2D1; margin-bottom: 40px; font-size: 1.1rem; font-weight: 300; }
+
+        .card {
+            background: rgba(59,63,81,0.3); border: 1px solid rgba(107,155,209,0.15);
+            border-radius: 8px; padding: 24px; margin-bottom: 24px;
+        }
+        .card-title {
+            font-size: 0.75rem; font-weight: 400; color: #6B9BD1;
+            text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 16px;
+        }
+
+        /* Mode tabs */
+        .mode-tabs { display: flex; gap: 0; border: 1px solid rgba(107,155,209,0.25); border-radius: 6px; overflow: hidden; width: fit-content; margin-bottom: 24px; }
+        .mode-tab {
+            padding: 10px 24px; background: transparent; color: #A8B2D1; border: none;
+            cursor: pointer; font-size: 0.95rem; font-weight: 300; transition: all 0.2s;
+        }
+        .mode-tab.active { background: rgba(107,155,209,0.2); color: #6B9BD1; }
+        .mode-tab:hover:not(.active) { background: rgba(107,155,209,0.06); color: #E6EDF3; }
+
+        /* Settings */
+        .settings-row { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end; }
+        .setting-group { display: flex; flex-direction: column; gap: 5px; }
+        .setting-group label { color: #A8B2D1; font-size: 0.8rem; font-weight: 300; }
+        .setting-group input[type="number"] {
+            width: 90px; padding: 8px 10px; background: #1A1B26;
+            border: 1px solid rgba(107,155,209,0.25); border-radius: 4px;
+            color: #E6EDF3; font-size: 0.95rem;
+        }
+        .setting-group input:focus { outline: none; border-color: #6B9BD1; }
+        .mode-hint { color: #6B7CA0; font-size: 0.82rem; font-weight: 300; margin-top: 8px; }
+
+        /* Drop zone */
+        .drop-zone {
+            border: 1px dashed rgba(107,155,209,0.4); border-radius: 8px;
+            padding: 50px 40px; text-align: center; background: rgba(59,63,81,0.15);
+            cursor: pointer; transition: all 0.2s; margin-bottom: 16px;
+        }
+        .drop-zone:hover, .drop-zone.dragover { border-color: #6B9BD1; background: rgba(107,155,209,0.08); }
+        .drop-zone p { font-size: 1.05rem; color: #E6EDF3; margin-bottom: 6px; font-weight: 300; }
+        .drop-zone small { color: #A8B2D1; font-weight: 300; font-size: 0.85rem; }
+
+        /* File list */
+        .file-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; margin-bottom: 16px; }
+        .file-table th {
+            padding: 9px 10px; text-align: left; color: #A8B2D1; font-weight: 400;
+            font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em;
+            background: rgba(26,27,38,0.5); border-bottom: 1px solid rgba(107,155,209,0.15);
+        }
+        .file-table td { padding: 8px 10px; border-bottom: 1px solid rgba(107,155,209,0.06); color: #A8B2D1; }
+        .file-table td.fname { color: #E6EDF3; }
+        .file-table td.ok { color: #3CB371; }
+        .file-table td.warn { color: #F5A623; }
+        .file-table td.err { color: #E06C75; }
+        .file-table tr.done td { opacity: 0.5; }
+
+        /* Buttons */
+        .btn {
+            background: transparent; color: #6B9BD1; border: 1px solid rgba(107,155,209,0.35);
+            padding: 9px 20px; border-radius: 4px; cursor: pointer; font-size: 0.88rem;
+            font-weight: 300; transition: all 0.2s; white-space: nowrap;
+        }
+        .btn:hover { background: rgba(107,155,209,0.1); border-color: #6B9BD1; }
+        .btn:disabled { opacity: 0.4; cursor: default; pointer-events: none; }
+        .btn-green { color: #3CB371; border-color: rgba(60,179,113,0.35); }
+        .btn-green:hover { background: rgba(60,179,113,0.1); border-color: #3CB371; }
+        .btn-muted { color: #B8956A; border-color: rgba(184,149,106,0.35); }
+        .btn-muted:hover { background: rgba(184,149,106,0.1); border-color: #B8956A; }
+
+        .btn-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+        /* Progress */
+        .progress-bar-outer { height: 6px; background: rgba(59,63,81,0.5); border-radius: 3px; overflow: hidden; margin: 10px 0; }
+        .progress-bar-inner { height: 100%; background: #6B9BD1; transition: width 0.2s; border-radius: 3px; }
+        .progress-label { color: #A8B2D1; font-size: 0.85rem; font-weight: 300; }
+
+        /* Stats grid */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+        .stat-card {
+            background: rgba(26,27,38,0.5); border: 1px solid rgba(107,155,209,0.1);
+            border-radius: 6px; padding: 16px;
+        }
+        .stat-card .sc-name { color: #6B9BD1; font-size: 0.78rem; font-weight: 400; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
+        .stat-row { display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 5px; }
+        .stat-row .sl { color: #A8B2D1; font-weight: 300; }
+        .stat-row .sv { color: #E6EDF3; font-weight: 400; }
+        .stat-row .sv.warn { color: #F5A623; }
+
+        /* Results table */
+        .results-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; }
+        .results-search {
+            padding: 7px 12px; background: #1A1B26; border: 1px solid rgba(107,155,209,0.2);
+            border-radius: 4px; color: #E6EDF3; font-size: 0.85rem; width: 220px;
+        }
+        .results-search:focus { outline: none; border-color: rgba(107,155,209,0.5); }
+        .results-search::placeholder { color: rgba(107,155,209,0.3); }
+        .tbl-wrap { overflow-x: auto; }
+        .res-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .res-table th {
+            padding: 10px 10px; text-align: left; font-weight: 400; font-size: 0.78rem;
+            color: #A8B2D1; background: rgba(26,27,38,0.6);
+            border-bottom: 1px solid rgba(107,155,209,0.2);
+            cursor: pointer; user-select: none; white-space: nowrap;
+        }
+        .res-table th:hover { color: #E6EDF3; }
+        .res-table th.sorted { color: #6B9BD1; }
+        .sort-arrow { opacity: 0.5; margin-left: 4px; }
+        .res-table tbody tr { transition: background 0.1s; }
+        .res-table tbody tr:hover { background: rgba(107,155,209,0.04); }
+        .res-table td {
+            padding: 7px 10px; border-bottom: 1px solid rgba(107,155,209,0.06);
+            color: #A8B2D1; font-weight: 300;
+        }
+        .res-table td.motif-cell { color: #E6EDF3; font-family: monospace; font-size: 0.9rem; }
+        .res-table td.num-cell { text-align: right; }
+        .res-table td.hi { color: #E6EDF3; }
+
+        /* Chart */
+        .chart-wrap { position: relative; height: 400px; }
+
+        /* Footer */
+        .footer {
+            text-align: center; padding: 40px 24px; color: #A8B2D1; font-size: 0.9rem;
+            font-weight: 300; border-top: 1px solid rgba(107,155,209,0.1); margin-top: 60px;
+        }
+        .footer a { color: #6B9BD1; text-decoration: none; }
+        .footer a:hover { text-decoration: underline; }
+
+        @media (max-width: 700px) { h1 { font-size: 1.7rem; } }
+    </style>
+</head>
+<body>
+
+<nav class="topnav">
+    <a href="/" class="brand">Owen Sanborn</a>
+    <a href="/#about">About</a>
+    <a href="/#publications">Publications</a>
+    <a href="/#tools" class="active">Tools</a>
+    <a href="/#contact">Contact</a>
+</nav>
+
+<div class="container">
+    <h1>RBPscan NGS Editing Analyzer</h1>
+    <p class="subtitle">Extract motifs and hairpin editing counts from FASTQ.gz files — all processed locally in your browser.</p>
+
+    <!-- Mode + Settings -->
+    <div class="card">
+        <div class="card-title">Analysis Mode</div>
+        <div class="mode-tabs">
+            <button class="mode-tab active" id="tabFwd" onclick="setMode('fwd')">FWD Only</button>
+            <button class="mode-tab" id="tabRev" onclick="setMode('rev')">FWD + REV</button>
+        </div>
+        <p class="mode-hint" id="modeHint">Motif and hairpin are both extracted from the R1 (forward) read.</p>
+        <div class="settings-row" style="margin-top: 18px;">
+            <div class="setting-group">
+                <label>Min occurrences per motif</label>
+                <input type="number" id="minOcc" value="5" min="1" step="1">
+            </div>
+        </div>
+    </div>
+
+    <!-- Drop zone -->
+    <div class="card">
+        <div class="card-title" id="dropTitle">Upload Files</div>
+        <div class="drop-zone" id="dropZone">
+            <p id="dropText">Drop FASTQ.gz files here</p>
+            <small id="dropHint">or click to select — all processing happens in your browser</small>
+            <input type="file" id="fileInput" multiple accept=".gz,.fastq,.fq" style="display:none">
+        </div>
+
+        <!-- File list -->
+        <div id="fileListWrap" style="display:none">
+            <table class="file-table" id="fileList"></table>
+            <div class="btn-row" style="margin-top: 14px;">
+                <button class="btn btn-green" id="runBtn" onclick="runAnalysis()">Run Analysis</button>
+                <button class="btn btn-muted" onclick="clearFiles()">Clear</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Progress -->
+    <div class="card" id="progressCard" style="display:none">
+        <div class="card-title">Processing</div>
+        <p class="progress-label" id="progressLabel">Starting...</p>
+        <div class="progress-bar-outer"><div class="progress-bar-inner" id="progressBar" style="width:0%"></div></div>
+        <p class="progress-label" id="progressSub" style="margin-top: 6px; color: #6B7CA0;"></p>
+    </div>
+
+    <!-- Stats -->
+    <div class="card" id="statsCard" style="display:none">
+        <div class="card-title">Run Statistics</div>
+        <div class="stats-grid" id="statsGrid"></div>
+    </div>
+
+    <!-- Results table -->
+    <div class="card" id="resultsCard" style="display:none">
+        <div class="results-header">
+            <div class="card-title" style="margin-bottom:0">Results</div>
+            <div style="display:flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <input type="text" class="results-search" id="searchInput" placeholder="Filter motif or sample…" oninput="renderTable()">
+                <button class="btn" onclick="downloadCSV()">Download CSV</button>
+            </div>
+        </div>
+        <div class="tbl-wrap">
+            <table class="res-table" id="resTable">
+                <thead>
+                    <tr>
+                        <th onclick="sortBy('sample')">Sample <span class="sort-arrow" id="sa-sample"></span></th>
+                        <th onclick="sortBy('motif')">Motif <span class="sort-arrow" id="sa-motif"></span></th>
+                        <th onclick="sortBy('occurrence')" class="sorted">Reads <span class="sort-arrow" id="sa-occurrence">▼</span></th>
+                        <th onclick="sortBy('readsEdited')">Edited Reads <span class="sort-arrow" id="sa-readsEdited"></span></th>
+                        <th onclick="sortBy('pctEdited')">% Edited <span class="sort-arrow" id="sa-pctEdited"></span></th>
+                        <th onclick="sortBy('score')">Score <span class="sort-arrow" id="sa-score"></span></th>
+                        <th onclick="sortBy('efficiency')">Efficiency <span class="sort-arrow" id="sa-efficiency"></span></th>
+                    </tr>
+                </thead>
+                <tbody id="resTbody"></tbody>
+            </table>
+        </div>
+        <p style="color:#6B7CA0; font-size:0.78rem; margin-top: 10px;">
+            Score = mean edits per read &nbsp;·&nbsp; Efficiency = total edits / (6 × reads + 1)
+        </p>
+    </div>
+
+    <!-- Chart -->
+    <div class="card" id="chartCard" style="display:none">
+        <div class="card-title">Editing Efficiency vs. Occurrence</div>
+        <div class="chart-wrap"><canvas id="editChart"></canvas></div>
+    </div>
+</div>
+
+<footer class="footer"><a href="/">← Back to owensanborn.github.io</a></footer>
+
+<script>
+// ── Constants ─────────────────────────────────────────────────────────────────
+const MOTIF_LEFT  = 'TTCTGGCTGACATA';
+const MOTIF_RIGHT = 'ATACAATCAGATATGCA';
+const MOTIF_LEN   = 11;
+const HP_ANCHOR   = 'AATTT';
+const HP_RE       = /((?:AA[TC]C[TC]){6})(?=AATTT)/;
+const EDIT_SEQ    = 'AATCC';
+const N_SITES     = 6;
+
+const SAMPLE_COLORS = [
+    'rgba(107,155,209,0.75)', 'rgba(184,149,106,0.75)', 'rgba(60,179,113,0.75)',
+    'rgba(168,178,209,0.75)', 'rgba(245,166,35,0.75)',  'rgba(156,39,176,0.75)',
+    'rgba(224,108,117,0.75)', 'rgba(79,195,247,0.75)',  'rgba(174,213,129,0.75)',
+    'rgba(255,138,101,0.75)', 'rgba(186,104,200,0.75)', 'rgba(77,182,172,0.75)',
+];
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let appMode   = 'fwd';       // 'fwd' | 'rev'
+let pairs     = [];          // [{name, r1:File, r2:File|null}]
+let allStats  = [];          // per-sample run statistics
+let allResults = [];         // [{sample, motif, occurrence, totalEdits, readsEdited, score, efficiency}]
+let sortField = 'occurrence';
+let sortDir   = -1;          // -1 = desc, 1 = asc
+let editChart = null;
+
+// ── Mode ──────────────────────────────────────────────────────────────────────
+function setMode(m) {
+    appMode = m;
+    document.getElementById('tabFwd').classList.toggle('active', m === 'fwd');
+    document.getElementById('tabRev').classList.toggle('active', m === 'rev');
+    document.getElementById('modeHint').textContent = m === 'fwd'
+        ? 'Motif and hairpin are both extracted from the R1 (forward) read.'
+        : 'Motif extracted from R1; hairpin extracted from reverse-complemented R2. Files are auto-paired by name.';
+    document.getElementById('dropText').textContent =
+        m === 'fwd' ? 'Drop R1 FASTQ.gz files here' : 'Drop R1 + R2 FASTQ.gz files here';
+    document.getElementById('dropHint').textContent =
+        m === 'fwd' ? 'One file per sample — or click to select'
+                    : 'All files at once; R1/R2 auto-detected from filenames — or click to select';
+    clearFiles();
+}
+
+// ── File handling ─────────────────────────────────────────────────────────────
+const dropZone  = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragover'); handleFiles(e.dataTransfer.files); });
+fileInput.addEventListener('change', e => handleFiles(e.target.files));
+
+function handleFiles(files) {
+    const arr = Array.from(files);
+    if (appMode === 'fwd') {
+        pairs = arr.map(f => ({ name: sampleName(f.name), r1: f, r2: null }));
+    } else {
+        pairs = buildPairs(arr);
+    }
+    renderFileList();
+}
+
+// Detect R1 vs R2 from filename, return 1, 2, or 0 (unknown)
+function detectR(filename) {
+    const n = filename.replace(/\.fastq\.gz$|\.fq\.gz$|\.fastq$|\.fq$/i, '');
+    if (/_R1(?:[_.\-]|$)/i.test(n) || /[_\-]1(?:[_.\-]|$)/.test(n)) return 1;
+    if (/_R2(?:[_.\-]|$)/i.test(n) || /[_\-]2(?:[_.\-]|$)/.test(n)) return 2;
+    return 0;
+}
+
+function sampleName(filename) {
+    return filename
+        .replace(/\.fastq\.gz$|\.fq\.gz$|\.fastq$|\.fq$/i, '')
+        .replace(/_R[12](?:[_.\-].*)?$|[_\-]R[12]$/i, '')
+        .replace(/[_\-][12](?:[_.\-].*)?$/, '');
+}
+
+function buildPairs(files) {
+    const r1s = {}, r2s = {};
+    for (const f of files) {
+        const r = detectR(f.name);
+        const base = sampleName(f.name);
+        if (r === 1) r1s[base] = f;
+        else if (r === 2) r2s[base] = f;
+    }
+    const names = new Set([...Object.keys(r1s), ...Object.keys(r2s)]);
+    return Array.from(names).sort().map(name => ({ name, r1: r1s[name] || null, r2: r2s[name] || null }));
+}
+
+function renderFileList() {
+    const wrap = document.getElementById('fileListWrap');
+    const tbl  = document.getElementById('fileList');
+    if (pairs.length === 0) { wrap.style.display = 'none'; return; }
+    wrap.style.display = 'block';
+
+    const hasPairs = appMode === 'rev';
+    let html = `<tr>
+        <th>#</th><th>Sample</th><th>R1 File</th>
+        ${hasPairs ? '<th>R2 File</th><th>Status</th>' : '<th>Status</th>'}
+    </tr>`;
+
+    for (let i = 0; i < pairs.length; i++) {
+        const p = pairs[i];
+        const r1ok = !!p.r1, r2ok = !!p.r2;
+        const status = hasPairs
+            ? (r1ok && r2ok ? `<td class="ok">Ready</td>` : `<td class="warn">⚠ ${!r1ok ? 'Missing R1' : 'Missing R2'}</td>`)
+            : `<td class="ok">Ready</td>`;
+        const r2cell = hasPairs
+            ? `<td class="fname">${p.r2 ? p.r2.name : '<span style="color:#E06C75">—</span>'}</td>` : '';
+        html += `<tr id="pair-row-${i}">
+            <td>${i + 1}</td>
+            <td class="fname">${p.name}</td>
+            <td class="fname">${p.r1 ? p.r1.name : '<span style="color:#E06C75">—</span>'}</td>
+            ${r2cell}${status}
+        </tr>`;
+    }
+    tbl.innerHTML = html;
+
+    const canRun = hasPairs ? pairs.every(p => p.r1 && p.r2) : pairs.length > 0;
+    document.getElementById('runBtn').disabled = !canRun;
+}
+
+function clearFiles() {
+    pairs = [];
+    fileInput.value = '';
+    document.getElementById('fileListWrap').style.display = 'none';
+    hide('progressCard'); hide('statsCard'); hide('resultsCard'); hide('chartCard');
+    allResults = []; allStats = [];
+}
+
+// ── Analysis ──────────────────────────────────────────────────────────────────
+async function runAnalysis() {
+    document.getElementById('runBtn').disabled = true;
+    allResults = []; allStats = [];
+    show('progressCard'); hide('statsCard'); hide('resultsCard'); hide('chartCard');
+    const minOcc = parseInt(document.getElementById('minOcc').value) || 5;
+
+    for (let i = 0; i < pairs.length; i++) {
+        const p = pairs[i];
+        markPairRow(i, 'processing');
+        setProgress(`Processing sample ${i+1}/${pairs.length}: ${p.name}`, 0, '');
+
+        try {
+            let stats, motifCounts;
+            if (appMode === 'fwd') {
+                ({ stats, motifCounts } = await processFwd(p.r1, p.name));
+            } else {
+                ({ stats, motifCounts } = await processRev(p.r1, p.r2, p.name));
+            }
+            allStats.push({ name: p.name, ...stats });
+            buildResults(p.name, motifCounts, minOcc);
+            markPairRow(i, 'done');
+        } catch (err) {
+            console.error(err);
+            markPairRow(i, 'error', err.message);
+        }
+    }
+
+    setProgress('Done', 100, '');
+    renderStats();
+    renderTable();
+    renderChart();
+    show('statsCard'); show('resultsCard'); show('chartCard');
+}
+
+function markPairRow(i, state, msg) {
+    const row = document.getElementById(`pair-row-${i}`);
+    if (!row) return;
+    const cells = row.querySelectorAll('td');
+    const last  = cells[cells.length - 1];
+    if (state === 'processing') last.innerHTML = '<span style="color:#6B9BD1">⟳ Processing…</span>';
+    else if (state === 'done')  last.innerHTML = '<span style="color:#3CB371">✓ Done</span>';
+    else if (state === 'error') last.innerHTML = `<span style="color:#E06C75">✗ ${msg || 'Error'}</span>`;
+    if (state === 'done') row.classList.add('done');
+}
+
+// ── FWD processing ────────────────────────────────────────────────────────────
+async function processFwd(file, name) {
+    const motifCounts = new Map();
+    let totalReads = 0, motifReads = 0, hairpinReads = 0;
+
+    await parseFastqGz(file, false, (readId, seq) => {
+        totalReads++;
+        const motif = extractMotif(seq);
+        if (!motif) return;
+        motifReads++;
+        const edits = extractHairpin(seq);
+        if (edits !== null) hairpinReads++;
+        const e = motifCounts.get(motif) || { occurrence: 0, totalEdits: 0, readsEdited: 0 };
+        e.occurrence++;
+        e.totalEdits += (edits ?? 0);
+        if ((edits ?? 0) > 0) e.readsEdited++;
+        motifCounts.set(motif, e);
+    }, (pct, reads) => setProgress(`${name}: scanning reads…`, pct * 100, `${fmtN(reads)} reads`));
+
+    return { stats: { totalReads, motifReads, hairpinReads }, motifCounts };
+}
+
+// ── REV processing ────────────────────────────────────────────────────────────
+async function processRev(r1, r2, name) {
+    // Pass 1: R1 — extract motif per read_id
+    const readMotifMap = new Map();
+    let totalR1 = 0, motifReads = 0;
+
+    await parseFastqGz(r1, true, (readId, seq) => {
+        totalR1++;
+        const motif = extractMotif(seq);
+        if (motif) { motifReads++; readMotifMap.set(readId, motif); }
+    }, (pct, reads) => setProgress(`${name} R1: scanning motifs…`, pct * 50, `${fmtN(reads)} reads`));
+
+    // Pass 2: R2 — RC, extract hairpin, merge
+    const motifCounts = new Map();
+    let totalR2 = 0, hairpinReads = 0;
+
+    await parseFastqGz(r2, true, (readId, seq) => {
+        totalR2++;
+        if (!readMotifMap.has(readId)) return;
+        const motif  = readMotifMap.get(readId);
+        const rcSeq  = reverseComplement(seq);
+        const edits  = extractHairpin(rcSeq);
+        if (edits !== null) hairpinReads++;
+        const e = motifCounts.get(motif) || { occurrence: 0, totalEdits: 0, readsEdited: 0 };
+        e.occurrence++;
+        e.totalEdits += (edits ?? 0);
+        if ((edits ?? 0) > 0) e.readsEdited++;
+        motifCounts.set(motif, e);
+    }, (pct, reads) => setProgress(`${name} R2: scanning hairpins…`, 50 + pct * 50, `${fmtN(reads)} reads`));
+
+    return { stats: { totalR1, totalR2, motifReads, hairpinReads }, motifCounts };
+}
+
+// ── Sequence analysis helpers ─────────────────────────────────────────────────
+function extractMotif(seq) {
+    const li = seq.indexOf(MOTIF_LEFT);
+    if (li === -1) return null;
+    const motifStart = li + MOTIF_LEFT.length;
+    if (seq.substring(motifStart + MOTIF_LEN, motifStart + MOTIF_LEN + MOTIF_RIGHT.length) !== MOTIF_RIGHT) return null;
+    return seq.substring(motifStart, motifStart + MOTIF_LEN);
+}
+
+function extractHairpin(seq) {
+    if (!seq.includes(HP_ANCHOR)) return null;
+    const m = HP_RE.exec(seq);
+    if (!m) return null;
+    let count = 0, pos = 0, hp = m[1];
+    while ((pos = hp.indexOf(EDIT_SEQ, pos)) !== -1) { count++; pos += EDIT_SEQ.length; }
+    return count;
+}
+
+const RC_COMP = { A:'T', T:'A', G:'C', C:'G', a:'t', t:'a', g:'c', c:'g' };
+function reverseComplement(seq) {
+    let rc = '';
+    for (let i = seq.length - 1; i >= 0; i--) rc += RC_COMP[seq[i]] || 'N';
+    return rc;
+}
+
+// ── Build results ─────────────────────────────────────────────────────────────
+function buildResults(sample, motifCounts, minOcc) {
+    for (const [motif, e] of motifCounts) {
+        if (e.occurrence < minOcc) continue;
+        allResults.push({
+            sample,
+            motif,
+            occurrence:   e.occurrence,
+            totalEdits:   e.totalEdits,
+            readsEdited:  e.readsEdited,
+            pctEdited:    e.readsEdited / e.occurrence * 100,
+            score:        e.totalEdits / e.occurrence,
+            efficiency:   e.totalEdits / (N_SITES * e.occurrence + 1),
+        });
+    }
+}
+
+// ── FASTQ parser (bgzip-aware pako streaming) ─────────────────────────────────
+function getBgzipBlockSize(data, offset) {
+    if (data[offset] !== 0x1f || data[offset+1] !== 0x8b) return -1;
+    if (!(data[offset+3] & 0x04)) return -1;
+    const xlen = data[offset+10] | (data[offset+11] << 8);
+    let pos = offset + 12, end = pos + xlen;
+    while (pos + 4 <= end) {
+        if (data[pos] === 0x42 && data[pos+1] === 0x43 && (data[pos+2] | (data[pos+3]<<8)) === 2)
+            return (data[pos+4] | (data[pos+5]<<8)) + 1;
+        pos += 4 + (data[pos+2] | (data[pos+3]<<8));
+    }
+    return -1;
+}
+
+async function parseFastqGz(file, needId, onRead, onProgress) {
+    const ab         = await file.arrayBuffer();
+    const compressed = new Uint8Array(ab);
+    const isBgzip    = getBgzipBlockSize(compressed, 0) > 0;
+    let buffer = '', lineCount = 0, readCount = 0, offset = 0, memberCount = 0;
+    let currentId = null;
+
+    while (offset < compressed.length) {
+        if (compressed[offset] !== 0x1f || compressed[offset+1] !== 0x8b) break;
+        memberCount++;
+        const blockSize = isBgzip ? getBgzipBlockSize(compressed, offset) : compressed.length - offset;
+        if (isBgzip && blockSize <= 0) break;
+
+        const block = compressed.subarray(offset, offset + blockSize);
+        let decompressed;
+        try { decompressed = pako.inflate(block); }
+        catch (e) {
+            if (!isBgzip && memberCount === 1) decompressed = pako.inflate(compressed);
+            else throw new Error('Decompression failed: ' + e.message);
+        }
+
+        buffer += new TextDecoder().decode(decompressed);
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+
+        for (const line of lines) {
+            lineCount++;
+            const pos = (lineCount - 1) % 4;
+            if (pos === 0 && needId) {
+                currentId = line.substring(1).split(' ')[0];
+            } else if (pos === 1) {
+                onRead(currentId, line);
+                readCount++;
+            }
+        }
+
+        offset += isBgzip ? blockSize : compressed.length;
+
+        if (memberCount % 300 === 0 || memberCount === 1) {
+            onProgress(offset / compressed.length, readCount);
+            await new Promise(r => setTimeout(r, 0));
+        }
+    }
+
+    // Flush remaining buffer
+    if (buffer) {
+        for (const line of buffer.split('\n')) {
+            lineCount++;
+            const pos = (lineCount - 1) % 4;
+            if (pos === 0 && needId) currentId = line.substring(1).split(' ')[0];
+            else if (pos === 1 && line) { onRead(currentId, line); readCount++; }
+        }
+    }
+    onProgress(1, readCount);
+}
+
+// ── Stats rendering ───────────────────────────────────────────────────────────
+function renderStats() {
+    const grid = document.getElementById('statsGrid');
+    grid.innerHTML = allStats.map(s => {
+        const isRev = s.totalR2 !== undefined;
+        const totalReads = isRev ? s.totalR1 : s.totalReads;
+        const motifPct = totalReads > 0 ? (s.motifReads / totalReads * 100).toFixed(1) : '—';
+        const hpOf     = isRev ? s.totalR2 : s.motifReads;
+        const hpPct    = hpOf > 0 ? (s.hairpinReads / hpOf * 100).toFixed(1) : '—';
+        const nMotifs  = allResults.filter(r => r.sample === s.name).length;
+
+        return `<div class="stat-card">
+            <div class="sc-name">${s.name}</div>
+            ${isRev ? `<div class="stat-row"><span class="sl">R1 reads</span><span class="sv">${fmtN(s.totalR1)}</span></div>
+                       <div class="stat-row"><span class="sl">R2 reads</span><span class="sv">${fmtN(s.totalR2)}</span></div>`
+                    : `<div class="stat-row"><span class="sl">Total reads</span><span class="sv">${fmtN(s.totalReads)}</span></div>`}
+            <div class="stat-row"><span class="sl">Motif matched</span><span class="sv">${fmtN(s.motifReads)} <span style="color:#6B7CA0">(${motifPct}%)</span></span></div>
+            <div class="stat-row"><span class="sl">Hairpin found</span><span class="sv">${fmtN(s.hairpinReads)} <span style="color:#6B7CA0">(${hpPct}%)</span></span></div>
+            <div class="stat-row"><span class="sl">Motifs above threshold</span><span class="sv">${fmtN(nMotifs)}</span></div>
+        </div>`;
+    }).join('');
+}
+
+// ── Results table ─────────────────────────────────────────────────────────────
+function sortBy(field) {
+    if (sortField === field) sortDir *= -1;
+    else { sortField = field; sortDir = -1; }
+    document.querySelectorAll('.sort-arrow').forEach(el => el.textContent = '');
+    document.getElementById('sa-' + field).textContent = sortDir === -1 ? '▼' : '▲';
+    document.querySelectorAll('.res-table th').forEach(th => th.classList.remove('sorted'));
+    document.querySelectorAll('.res-table th').forEach((th, i) => {
+        if (th.getAttribute('onclick') === `sortBy('${field}')`) th.classList.add('sorted');
+    });
+    renderTable();
+}
+
+function renderTable() {
+    const q = (document.getElementById('searchInput').value || '').toLowerCase();
+    let rows = allResults.filter(r =>
+        !q || r.motif.toLowerCase().includes(q) || r.sample.toLowerCase().includes(q)
+    );
+    rows.sort((a, b) => sortDir * (a[sortField] > b[sortField] ? 1 : a[sortField] < b[sortField] ? -1 : 0));
+
+    document.getElementById('resTbody').innerHTML = rows.map(r => `<tr>
+        <td>${r.sample}</td>
+        <td class="motif-cell">${r.motif}</td>
+        <td class="num-cell hi">${fmtN(r.occurrence)}</td>
+        <td class="num-cell">${fmtN(r.readsEdited)}</td>
+        <td class="num-cell">${r.pctEdited.toFixed(1)}%</td>
+        <td class="num-cell">${r.score.toFixed(3)}</td>
+        <td class="num-cell hi">${r.efficiency.toFixed(4)}</td>
+    </tr>`).join('');
+}
+
+// ── Chart ─────────────────────────────────────────────────────────────────────
+function renderChart() {
+    const samples = [...new Set(allResults.map(r => r.sample))];
+    const datasets = samples.map((s, si) => ({
+        label: s,
+        data: allResults.filter(r => r.sample === s).map(r => ({
+            x: r.occurrence, y: r.efficiency, motif: r.motif, score: r.score
+        })),
+        backgroundColor: SAMPLE_COLORS[si % SAMPLE_COLORS.length],
+        pointRadius: 5,
+        pointHoverRadius: 7,
+    }));
+
+    Chart.defaults.color = '#A8B2D1';
+    Chart.defaults.borderColor = 'rgba(107,155,209,0.12)';
+
+    if (editChart) { editChart.destroy(); editChart = null; }
+    editChart = new Chart(document.getElementById('editChart'), {
+        type: 'scatter',
+        data: { datasets },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { labels: { color: '#A8B2D1', font: { weight: 300 } } },
+                tooltip: { callbacks: { label: ctx => {
+                    const d = ctx.raw;
+                    return `${d.motif} | reads: ${fmtN(d.x)} | eff: ${d.y.toFixed(4)} | score: ${d.score.toFixed(3)}`;
+                }}}
+            },
+            scales: {
+                x: {
+                    type: 'logarithmic',
+                    title: { display: true, text: 'Occurrence (reads, log scale)', color: '#A8B2D1' },
+                    ticks: { color: '#A8B2D1' }, grid: { color: 'rgba(107,155,209,0.08)' },
+                },
+                y: {
+                    min: 0,
+                    title: { display: true, text: 'Editing Efficiency', color: '#A8B2D1' },
+                    ticks: { color: '#A8B2D1' }, grid: { color: 'rgba(107,155,209,0.08)' },
+                },
+            },
+        },
+    });
+}
+
+// ── CSV download ──────────────────────────────────────────────────────────────
+function downloadCSV() {
+    const header = 'sample,motif,occurrence,total_edits,reads_edited,pct_edited,score,efficiency_1';
+    const rows = allResults.map(r =>
+        [r.sample, r.motif, r.occurrence, r.totalEdits, r.readsEdited,
+         r.pctEdited.toFixed(2), r.score.toFixed(4), r.efficiency.toFixed(6)].join(',')
+    );
+    const blob = new Blob([header + '\n' + rows.join('\n')], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'rbpscan_editing_results.csv';
+    a.click();
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+function setProgress(label, pct, sub) {
+    document.getElementById('progressLabel').textContent = label;
+    document.getElementById('progressBar').style.width = pct + '%';
+    document.getElementById('progressSub').textContent = sub;
+}
+function fmtN(n) { return n == null ? '—' : Number(n).toLocaleString(); }
+function show(id) { document.getElementById(id).style.display = 'block'; }
+function hide(id) { document.getElementById(id).style.display = 'none'; }
+</script>
+</body>
+</html>
