@@ -174,6 +174,10 @@
         .res-table td.num-cell { text-align: right; }
         .res-table td.hi { color: #E6EDF3; }
 
+        /* Barcode column (hidden unless barcode mode active) */
+        .barcode-col { display: none; }
+        .barcode-active .barcode-col { display: table-cell; }
+
         /* Chart */
         .chart-wrap { position: relative; height: 400px; }
 
@@ -223,11 +227,11 @@
                 <div class="seq-grid">
                     <div class="setting-group">
                         <label>Left flank</label>
-                        <input type="text" id="motifLeft" class="seq-input" value="TTCTGGCTGACATA">
+                        <input type="text" id="motifLeft" class="seq-input" value="AACGCTATTCTGGCT">
                     </div>
                     <div class="setting-group">
                         <label>Right flank</label>
-                        <input type="text" id="motifRight" class="seq-input" value="ATACAATCAGATATGCA">
+                        <input type="text" id="motifRight" class="seq-input" value="CCAACGCAATTCTGGCAC">
                     </div>
                     <div class="setting-group">
                         <label>HP repeat unit (regex)</label>
@@ -280,6 +284,28 @@
                         <label style="margin-left: 14px;">
                             <input type="checkbox" id="rcHairpin" checked> RC hairpin read
                         </label>
+                    </div>
+                </div>
+
+                <hr class="seq-divider">
+
+                <!-- Barcode demultiplexing -->
+                <div class="seq-section-label">Barcode Demultiplexing</div>
+                <div class="radio-group" style="margin-bottom: 10px;">
+                    <label>
+                        <input type="checkbox" id="barcodeEnabled" onchange="onBarcodeChange()">
+                        Split by barcode (first/last N bases of extracted motif)
+                    </label>
+                </div>
+                <div id="barcodeOpts" style="display:none">
+                    <div class="radio-group">
+                        <span style="color:#A8B2D1; font-size:0.85rem;">Position:</span>
+                        <label><input type="radio" name="barcodePos" value="start" checked> First N nt</label>
+                        <label><input type="radio" name="barcodePos" value="end"> Last N nt</label>
+                        <div class="setting-group" style="margin-left: 14px;">
+                            <label>N bases</label>
+                            <input type="number" id="barcodeLen" value="4" min="1" max="20" step="1" style="width:70px">
+                        </div>
                     </div>
                 </div>
 
@@ -336,19 +362,19 @@
                 <thead>
                     <tr>
                         <th onclick="sortBy('sample')">Sample <span class="sort-arrow" id="sa-sample"></span></th>
+                        <th class="barcode-col" onclick="sortBy('barcode')">Barcode <span class="sort-arrow" id="sa-barcode"></span></th>
                         <th onclick="sortBy('motif')">Motif <span class="sort-arrow" id="sa-motif"></span></th>
                         <th onclick="sortBy('occurrence')" class="sorted">Reads <span class="sort-arrow" id="sa-occurrence">▼</span></th>
                         <th onclick="sortBy('readsEdited')">Edited Reads <span class="sort-arrow" id="sa-readsEdited"></span></th>
                         <th onclick="sortBy('pctEdited')">% Edited <span class="sort-arrow" id="sa-pctEdited"></span></th>
                         <th onclick="sortBy('score')">Score <span class="sort-arrow" id="sa-score"></span></th>
-                        <th onclick="sortBy('efficiency')">Efficiency <span class="sort-arrow" id="sa-efficiency"></span></th>
                     </tr>
                 </thead>
                 <tbody id="resTbody"></tbody>
             </table>
         </div>
         <p style="color:#6B7CA0; font-size:0.78rem; margin-top: 10px;">
-            Score = mean edits per read &nbsp;·&nbsp; Efficiency = total edits / (N_SITES × reads + 1)
+            Score = mean edits per read × 100
         </p>
     </div>
 
@@ -371,28 +397,33 @@ const SAMPLE_COLORS = [
 ];
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let appMode   = 'fwd';       // 'fwd' | 'paired' | 'interleaved'
-let pairs     = [];          // [{name, r1:File, r2:File|null}]
-let allStats  = [];
-let allResults = [];
-let sortField = 'occurrence';
-let sortDir   = -1;
-let editChart = null;
+let appMode      = 'fwd';    // 'fwd' | 'paired' | 'interleaved'
+let pairs        = [];       // [{name, r1:File, r2:File|null}]
+let allStats     = [];
+let allResults   = [];
+let sortField    = 'occurrence';
+let sortDir      = -1;
+let editChart    = null;
+let barcodeActive = false;   // true when last run used barcode splitting
 
 // ── Settings ──────────────────────────────────────────────────────────────────
 function getSettings() {
-    const motifReadEl = document.querySelector('input[name="motifRead"]:checked');
+    const motifReadEl  = document.querySelector('input[name="motifRead"]:checked');
+    const barcodePosEl = document.querySelector('input[name="barcodePos"]:checked');
     const cfg = {
-        motifLeft:  document.getElementById('motifLeft').value.trim(),
-        motifRight: document.getElementById('motifRight').value.trim(),
-        hpRepeat:   document.getElementById('hpRepeat').value.trim(),
-        hpCount:    parseInt(document.getElementById('hpCount').value) || 6,
-        hpAnchor:   document.getElementById('hpAnchor').value.trim(),
-        editSeq:    document.getElementById('editSeq').value.trim(),
-        nSites:     parseInt(document.getElementById('nSites').value) || 6,
-        mode:       appMode,
-        motifRead:  motifReadEl ? motifReadEl.value : 'R1',
-        rcHairpin:  document.getElementById('rcHairpin').checked,
+        motifLeft:      document.getElementById('motifLeft').value.trim(),
+        motifRight:     document.getElementById('motifRight').value.trim(),
+        hpRepeat:       document.getElementById('hpRepeat').value.trim(),
+        hpCount:        parseInt(document.getElementById('hpCount').value) || 6,
+        hpAnchor:       document.getElementById('hpAnchor').value.trim(),
+        editSeq:        document.getElementById('editSeq').value.trim(),
+        nSites:         parseInt(document.getElementById('nSites').value) || 6,
+        mode:           appMode,
+        motifRead:      motifReadEl ? motifReadEl.value : 'R1',
+        rcHairpin:      document.getElementById('rcHairpin').checked,
+        barcodeEnabled: document.getElementById('barcodeEnabled').checked,
+        barcodePos:     barcodePosEl ? barcodePosEl.value : 'start',
+        barcodeLen:     parseInt(document.getElementById('barcodeLen').value) || 4,
     };
     // Pre-build HP regex for performance (avoid re-compiling per read)
     cfg.HP_RE = cfg.hpAnchor
@@ -442,6 +473,11 @@ function onModeChange() {
     document.getElementById('dropHint').textContent  = dropHints[appMode];
 
     clearFiles();
+}
+
+function onBarcodeChange() {
+    const enabled = document.getElementById('barcodeEnabled').checked;
+    document.getElementById('barcodeOpts').style.display = enabled ? 'block' : 'none';
 }
 
 // ── File handling ─────────────────────────────────────────────────────────────
@@ -540,6 +576,7 @@ async function runAnalysis() {
     show('progressCard'); hide('statsCard'); hide('resultsCard'); hide('chartCard');
 
     const cfg    = getSettings();
+    barcodeActive = cfg.barcodeEnabled;
     const minOcc = parseInt(document.getElementById('minOcc').value) || 5;
     console.log('[NGS] runAnalysis: mode=%s, pairs=%d, motifLeft=%s', cfg.mode, pairs.length, cfg.motifLeft);
 
@@ -584,6 +621,17 @@ function markPairRow(i, state, msg) {
     if (state === 'done') row.classList.add('done');
 }
 
+// ── Barcode helper ────────────────────────────────────────────────────────────
+function splitMotifBarcode(motif, cfg) {
+    if (!cfg.barcodeEnabled || !motif) return { barcode: '', varMotif: motif || '' };
+    const n = cfg.barcodeLen;
+    if (cfg.barcodePos === 'start') {
+        return { barcode: motif.substring(0, n), varMotif: motif.substring(n) };
+    } else {
+        return { barcode: motif.substring(motif.length - n), varMotif: motif.substring(0, motif.length - n) };
+    }
+}
+
 // ── FWD processing ────────────────────────────────────────────────────────────
 async function processFwd(file, name, cfg) {
     const motifCounts = new Map();
@@ -591,16 +639,18 @@ async function processFwd(file, name, cfg) {
 
     await parseFastq(file, false, (readId, seq) => {
         totalReads++;
-        const motif = extractMotif(seq, cfg);
-        if (!motif) return;
+        const fullMotif = extractMotif(seq, cfg);
+        if (!fullMotif) return;
         motifReads++;
+        const { barcode, varMotif } = splitMotifBarcode(fullMotif, cfg);
+        const key = barcode + '\x00' + varMotif;
         const edits = extractHairpin(seq, cfg);
         if (edits !== null) hairpinReads++;
-        const e = motifCounts.get(motif) || { occurrence: 0, totalEdits: 0, readsEdited: 0 };
+        const e = motifCounts.get(key) || { barcode, varMotif, occurrence: 0, totalEdits: 0, readsEdited: 0 };
         e.occurrence++;
         e.totalEdits += (edits ?? 0);
         if ((edits ?? 0) > 0) e.readsEdited++;
-        motifCounts.set(motif, e);
+        motifCounts.set(key, e);
     }, (pct, reads) => setProgress(`${name}: scanning reads…`, pct * 100, `${fmtN(reads)} reads`));
 
     return { stats: { totalReads, motifReads, hairpinReads }, motifCounts };
@@ -629,15 +679,17 @@ async function processRev(r1, r2, name, cfg) {
     await parseFastq(hpFile, true, (readId, seq) => {
         totalHp++;
         if (!readMotifMap.has(readId)) return;
-        const motif  = readMotifMap.get(readId);
+        const fullMotif = readMotifMap.get(readId);
+        const { barcode, varMotif } = splitMotifBarcode(fullMotif, cfg);
+        const key    = barcode + '\x00' + varMotif;
         const hpSeq  = cfg.rcHairpin ? reverseComplement(seq) : seq;
         const edits  = extractHairpin(hpSeq, cfg);
         if (edits !== null) hairpinReads++;
-        const e = motifCounts.get(motif) || { occurrence: 0, totalEdits: 0, readsEdited: 0 };
+        const e = motifCounts.get(key) || { barcode, varMotif, occurrence: 0, totalEdits: 0, readsEdited: 0 };
         e.occurrence++;
         e.totalEdits += (edits ?? 0);
         if ((edits ?? 0) > 0) e.readsEdited++;
-        motifCounts.set(motif, e);
+        motifCounts.set(key, e);
     }, (pct, reads) => setProgress(`${name} hairpin read: scanning…`, 50 + pct * 50, `${fmtN(reads)} reads`));
 
     return { stats: { totalR1: totalMotif, totalR2: totalHp, motifReads, hairpinReads }, motifCounts };
@@ -670,13 +722,15 @@ async function processInterleaved(file, name, cfg) {
 
     // Merge: for each read with a motif, look up its paired hairpin read
     const motifCounts = new Map();
-    for (const [readId, motif] of readMotifMap) {
+    for (const [readId, fullMotif] of readMotifMap) {
         const edits = hairpinMap.has(readId) ? hairpinMap.get(readId) : null;
-        const e = motifCounts.get(motif) || { occurrence: 0, totalEdits: 0, readsEdited: 0 };
+        const { barcode, varMotif } = splitMotifBarcode(fullMotif, cfg);
+        const key = barcode + '\x00' + varMotif;
+        const e = motifCounts.get(key) || { barcode, varMotif, occurrence: 0, totalEdits: 0, readsEdited: 0 };
         e.occurrence++;
         e.totalEdits += (edits ?? 0);
         if ((edits ?? 0) > 0) e.readsEdited++;
-        motifCounts.set(motif, e);
+        motifCounts.set(key, e);
     }
 
     return { stats: { totalR1, totalR2, motifReads, hairpinReads }, motifCounts };
@@ -719,17 +773,17 @@ function reverseComplement(seq) {
 
 // ── Build results ─────────────────────────────────────────────────────────────
 function buildResults(sample, motifCounts, minOcc, cfg) {
-    for (const [motif, e] of motifCounts) {
+    for (const [key, e] of motifCounts) {
         if (e.occurrence < minOcc) continue;
         allResults.push({
             sample,
-            motif,
+            barcode:     e.barcode,
+            motif:       e.varMotif,
             occurrence:  e.occurrence,
             totalEdits:  e.totalEdits,
             readsEdited: e.readsEdited,
             pctEdited:   e.readsEdited / e.occurrence * 100,
-            score:       e.totalEdits / e.occurrence,
-            efficiency:  e.totalEdits / (cfg.nSites * e.occurrence + 1),
+            score:       e.totalEdits / e.occurrence * 100,
         });
     }
 }
@@ -896,24 +950,26 @@ function renderTable() {
     );
     rows.sort((a, b) => sortDir * (a[sortField] > b[sortField] ? 1 : a[sortField] < b[sortField] ? -1 : 0));
 
+    document.getElementById('resTable').classList.toggle('barcode-active', barcodeActive);
     document.getElementById('resTbody').innerHTML = rows.map(r => `<tr>
         <td>${r.sample}</td>
+        <td class="barcode-col motif-cell">${r.barcode}</td>
         <td class="motif-cell">${r.motif}</td>
         <td class="num-cell hi">${fmtN(r.occurrence)}</td>
         <td class="num-cell">${fmtN(r.readsEdited)}</td>
         <td class="num-cell">${r.pctEdited.toFixed(1)}%</td>
-        <td class="num-cell">${r.score.toFixed(3)}</td>
-        <td class="num-cell hi">${r.efficiency.toFixed(4)}</td>
+        <td class="num-cell hi">${r.score.toFixed(2)}</td>
     </tr>`).join('');
 }
 
 // ── Chart ─────────────────────────────────────────────────────────────────────
 function renderChart() {
-    const samples = [...new Set(allResults.map(r => r.sample))];
-    const datasets = samples.map((s, si) => ({
-        label: s,
-        data: allResults.filter(r => r.sample === s).map(r => ({
-            x: r.occurrence, y: r.efficiency, motif: r.motif, score: r.score
+    const groupKey = r => barcodeActive && r.barcode ? `${r.sample} [${r.barcode}]` : r.sample;
+    const groups   = [...new Set(allResults.map(groupKey))];
+    const datasets = groups.map((g, si) => ({
+        label: g,
+        data: allResults.filter(r => groupKey(r) === g).map(r => ({
+            x: r.occurrence, y: r.score, motif: r.motif,
         })),
         backgroundColor: SAMPLE_COLORS[si % SAMPLE_COLORS.length],
         pointRadius: 5,
@@ -933,7 +989,7 @@ function renderChart() {
                 legend: { labels: { color: '#A8B2D1', font: { weight: 300 } } },
                 tooltip: { callbacks: { label: ctx => {
                     const d = ctx.raw;
-                    return `${d.motif} | reads: ${fmtN(d.x)} | eff: ${d.y.toFixed(4)} | score: ${d.score.toFixed(3)}`;
+                    return `${d.motif} | reads: ${fmtN(d.x)} | score: ${d.y.toFixed(2)}`;
                 }}}
             },
             scales: {
@@ -944,7 +1000,7 @@ function renderChart() {
                 },
                 y: {
                     min: 0,
-                    title: { display: true, text: 'Editing Efficiency', color: '#A8B2D1' },
+                    title: { display: true, text: 'Score (mean edits × 100)', color: '#A8B2D1' },
                     ticks: { color: '#A8B2D1' }, grid: { color: 'rgba(107,155,209,0.08)' },
                 },
             },
@@ -954,11 +1010,15 @@ function renderChart() {
 
 // ── CSV download ──────────────────────────────────────────────────────────────
 function downloadCSV() {
-    const header = 'sample,motif,occurrence,total_edits,reads_edited,pct_edited,score,efficiency';
-    const rows = allResults.map(r =>
-        [r.sample, r.motif, r.occurrence, r.totalEdits, r.readsEdited,
-         r.pctEdited.toFixed(2), r.score.toFixed(4), r.efficiency.toFixed(6)].join(',')
-    );
+    const barcodeHdr = barcodeActive ? ',barcode' : '';
+    const header = `sample${barcodeHdr},motif,occurrence,total_edits,reads_edited,pct_edited,score`;
+    const rows = allResults.map(r => {
+        const parts = [r.sample];
+        if (barcodeActive) parts.push(r.barcode);
+        parts.push(r.motif, r.occurrence, r.totalEdits, r.readsEdited,
+                   r.pctEdited.toFixed(2), r.score.toFixed(2));
+        return parts.join(',');
+    });
     const blob = new Blob([header + '\n' + rows.join('\n')], { type: 'text/csv' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
