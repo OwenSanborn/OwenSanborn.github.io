@@ -348,6 +348,24 @@
         <div class="stats-grid" id="statsGrid"></div>
     </div>
 
+    <!-- Barcode summary -->
+    <div class="card" id="barcodeCard" style="display:none">
+        <div class="card-title">Barcode Summary</div>
+        <div class="tbl-wrap">
+            <table class="res-table" id="barcodeTable">
+                <thead>
+                    <tr>
+                        <th>Barcode</th>
+                        <th style="text-align:right">Reads</th>
+                        <th style="text-align:right">Motifs</th>
+                        <th style="text-align:right">% of Total</th>
+                    </tr>
+                </thead>
+                <tbody id="barcodeTbody"></tbody>
+            </table>
+        </div>
+    </div>
+
     <!-- Results table -->
     <div class="card" id="resultsCard" style="display:none">
         <div class="results-header">
@@ -565,7 +583,7 @@ function clearFiles() {
     fileInput.value = '';
     document.getElementById('fileListWrap').style.display = 'none';
     document.getElementById('runBtn').disabled = true;
-    hide('progressCard'); hide('statsCard'); hide('resultsCard'); hide('chartCard');
+    hide('progressCard'); hide('statsCard'); hide('barcodeCard'); hide('resultsCard'); hide('chartCard');
     allResults = []; allStats = [];
 }
 
@@ -605,6 +623,7 @@ async function runAnalysis() {
 
     setProgress('Done', 100, '');
     renderStats();
+    renderBarcodeTable();
     renderTable();
     renderChart();
     show('statsCard'); show('resultsCard'); show('chartCard');
@@ -622,14 +641,11 @@ function markPairRow(i, state, msg) {
 }
 
 // ── Barcode helper ────────────────────────────────────────────────────────────
-function splitMotifBarcode(motif, cfg) {
-    if (!cfg.barcodeEnabled || !motif) return { barcode: '', varMotif: motif || '' };
+// Barcode is the first or last N bases of the raw read sequence itself
+function extractBarcode(seq, cfg) {
+    if (!cfg.barcodeEnabled) return '';
     const n = cfg.barcodeLen;
-    if (cfg.barcodePos === 'start') {
-        return { barcode: motif.substring(0, n), varMotif: motif.substring(n) };
-    } else {
-        return { barcode: motif.substring(motif.length - n), varMotif: motif.substring(0, motif.length - n) };
-    }
+    return cfg.barcodePos === 'start' ? seq.substring(0, n) : seq.substring(seq.length - n);
 }
 
 // ── FWD processing ────────────────────────────────────────────────────────────
@@ -639,14 +655,14 @@ async function processFwd(file, name, cfg) {
 
     await parseFastq(file, false, (readId, seq) => {
         totalReads++;
-        const fullMotif = extractMotif(seq, cfg);
-        if (!fullMotif) return;
+        const motif = extractMotif(seq, cfg);
+        if (!motif) return;
         motifReads++;
-        const { barcode, varMotif } = splitMotifBarcode(fullMotif, cfg);
-        const key = barcode + '\x00' + varMotif;
+        const barcode = extractBarcode(seq, cfg);
+        const key = barcode + '\x00' + motif;
         const edits = extractHairpin(seq, cfg);
         if (edits !== null) hairpinReads++;
-        const e = motifCounts.get(key) || { barcode, varMotif, occurrence: 0, totalEdits: 0, readsEdited: 0 };
+        const e = motifCounts.get(key) || { barcode, motif, occurrence: 0, totalEdits: 0, readsEdited: 0 };
         e.occurrence++;
         e.totalEdits += (edits ?? 0);
         if ((edits ?? 0) > 0) e.readsEdited++;
@@ -669,7 +685,7 @@ async function processRev(r1, r2, name, cfg) {
     await parseFastq(motifFile, true, (readId, seq) => {
         totalMotif++;
         const motif = extractMotif(seq, cfg);
-        if (motif) { motifReads++; readMotifMap.set(readId, motif); }
+        if (motif) { motifReads++; readMotifMap.set(readId, { motif, barcode: extractBarcode(seq, cfg) }); }
     }, (pct, reads) => setProgress(`${name} motif read: scanning…`, pct * 50, `${fmtN(reads)} reads`));
 
     // Pass 2: hairpin file
@@ -679,13 +695,12 @@ async function processRev(r1, r2, name, cfg) {
     await parseFastq(hpFile, true, (readId, seq) => {
         totalHp++;
         if (!readMotifMap.has(readId)) return;
-        const fullMotif = readMotifMap.get(readId);
-        const { barcode, varMotif } = splitMotifBarcode(fullMotif, cfg);
-        const key    = barcode + '\x00' + varMotif;
+        const { motif, barcode } = readMotifMap.get(readId);
+        const key    = barcode + '\x00' + motif;
         const hpSeq  = cfg.rcHairpin ? reverseComplement(seq) : seq;
         const edits  = extractHairpin(hpSeq, cfg);
         if (edits !== null) hairpinReads++;
-        const e = motifCounts.get(key) || { barcode, varMotif, occurrence: 0, totalEdits: 0, readsEdited: 0 };
+        const e = motifCounts.get(key) || { barcode, motif, occurrence: 0, totalEdits: 0, readsEdited: 0 };
         e.occurrence++;
         e.totalEdits += (edits ?? 0);
         if ((edits ?? 0) > 0) e.readsEdited++;
@@ -712,7 +727,7 @@ async function processInterleaved(file, name, cfg) {
 
         if (isMotifRead) {
             const motif = extractMotif(seq, cfg);
-            if (motif) { motifReads++; readMotifMap.set(readId, motif); }
+            if (motif) { motifReads++; readMotifMap.set(readId, { motif, barcode: extractBarcode(seq, cfg) }); }
         } else {
             const hpSeq = cfg.rcHairpin ? reverseComplement(seq) : seq;
             const edits = extractHairpin(hpSeq, cfg);
@@ -722,11 +737,10 @@ async function processInterleaved(file, name, cfg) {
 
     // Merge: for each read with a motif, look up its paired hairpin read
     const motifCounts = new Map();
-    for (const [readId, fullMotif] of readMotifMap) {
+    for (const [readId, { motif, barcode }] of readMotifMap) {
         const edits = hairpinMap.has(readId) ? hairpinMap.get(readId) : null;
-        const { barcode, varMotif } = splitMotifBarcode(fullMotif, cfg);
-        const key = barcode + '\x00' + varMotif;
-        const e = motifCounts.get(key) || { barcode, varMotif, occurrence: 0, totalEdits: 0, readsEdited: 0 };
+        const key = barcode + '\x00' + motif;
+        const e = motifCounts.get(key) || { barcode, motif, occurrence: 0, totalEdits: 0, readsEdited: 0 };
         e.occurrence++;
         e.totalEdits += (edits ?? 0);
         if ((edits ?? 0) > 0) e.readsEdited++;
@@ -778,7 +792,7 @@ function buildResults(sample, motifCounts, minOcc, cfg) {
         allResults.push({
             sample,
             barcode:     e.barcode,
-            motif:       e.varMotif,
+            motif:       e.motif,
             occurrence:  e.occurrence,
             totalEdits:  e.totalEdits,
             readsEdited: e.readsEdited,
@@ -904,6 +918,28 @@ async function parseFastqPlain(raw, needId, onRead, onProgress) {
     }
     console.log('[NGS] parseFastqPlain: done, readCount=%d', readCount);
     onProgress(1, readCount);
+}
+
+// ── Barcode summary table ─────────────────────────────────────────────────────
+function renderBarcodeTable() {
+    if (!barcodeActive) { hide('barcodeCard'); return; }
+    const barcodeMap = new Map();
+    for (const r of allResults) {
+        const b = r.barcode;
+        const e = barcodeMap.get(b) || { reads: 0, motifs: 0 };
+        e.reads  += r.occurrence;
+        e.motifs += 1;
+        barcodeMap.set(b, e);
+    }
+    const total = [...barcodeMap.values()].reduce((s, e) => s + e.reads, 0);
+    const rows  = [...barcodeMap.entries()].sort((a, b) => b[1].reads - a[1].reads);
+    document.getElementById('barcodeTbody').innerHTML = rows.map(([bc, e]) => `<tr>
+        <td class="motif-cell">${bc || '(none)'}</td>
+        <td class="num-cell hi">${fmtN(e.reads)}</td>
+        <td class="num-cell">${fmtN(e.motifs)}</td>
+        <td class="num-cell">${total > 0 ? (e.reads / total * 100).toFixed(1) : '—'}%</td>
+    </tr>`).join('');
+    show('barcodeCard');
 }
 
 // ── Stats rendering ───────────────────────────────────────────────────────────
