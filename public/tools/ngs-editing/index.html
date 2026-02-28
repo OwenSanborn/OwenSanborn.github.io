@@ -178,6 +178,10 @@
         .barcode-col { display: none; }
         .barcode-active .barcode-col { display: table-cell; }
 
+        /* Checkbox column in tables */
+        .chk-col { width: 32px; text-align: center; cursor: default; padding: 7px 4px; }
+        .chk-col input[type="checkbox"] { accent-color: #6B9BD1; cursor: pointer; }
+
         /* Chart */
         .chart-wrap { position: relative; height: 400px; }
 
@@ -344,8 +348,24 @@
 
     <!-- Stats -->
     <div class="card" id="statsCard" style="display:none">
-        <div class="card-title">Run Statistics</div>
-        <div class="stats-grid" id="statsGrid"></div>
+        <div style="display:flex; gap:32px; flex-wrap:wrap; align-items:flex-start;">
+            <div style="flex:1; min-width:280px;">
+                <div class="card-title">Run Statistics</div>
+                <div class="stats-grid" id="statsGrid"></div>
+            </div>
+            <div id="filterSummaryWrap" style="flex:0 0 auto; min-width:260px; display:none;">
+                <div class="card-title">Retained Reads (after filtering)</div>
+                <table class="res-table">
+                    <thead><tr>
+                        <th>Sample</th>
+                        <th style="text-align:right">All</th>
+                        <th style="text-align:right">Retained</th>
+                        <th style="text-align:right">%</th>
+                    </tr></thead>
+                    <tbody id="filterSummaryBody"></tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
     <!-- Barcode summary -->
@@ -355,6 +375,7 @@
             <table class="res-table" id="barcodeTable">
                 <thead>
                     <tr>
+                        <th class="chk-col"><input type="checkbox" id="barcodeSelectAll" onchange="toggleAllBarcodes(this)" title="Select all / none"></th>
                         <th>Barcode</th>
                         <th style="text-align:right">Reads</th>
                         <th style="text-align:right">Motifs</th>
@@ -379,6 +400,7 @@
             <table class="res-table" id="resTable">
                 <thead>
                     <tr>
+                        <th class="chk-col"><input type="checkbox" id="motifSelectAll" onchange="toggleAllMotifs(this)" title="Select all / none"></th>
                         <th onclick="sortBy('sample')">Sample <span class="sort-arrow" id="sa-sample"></span></th>
                         <th class="barcode-col" onclick="sortBy('barcode')">Barcode <span class="sort-arrow" id="sa-barcode"></span></th>
                         <th onclick="sortBy('motif')">Motif <span class="sort-arrow" id="sa-motif"></span></th>
@@ -422,7 +444,9 @@ let allResults   = [];
 let sortField    = 'occurrence';
 let sortDir      = -1;
 let editChart    = null;
-let barcodeActive = false;   // true when last run used barcode splitting
+let barcodeActive     = false;   // true when last run used barcode splitting
+let selectedBarcodes  = new Set(); // barcodes checked in barcode table
+let selectedMotifKeys = new Set(); // motif keys checked in results table
 
 // ── Settings ──────────────────────────────────────────────────────────────────
 function getSettings() {
@@ -585,6 +609,7 @@ function clearFiles() {
     document.getElementById('runBtn').disabled = true;
     hide('progressCard'); hide('statsCard'); hide('barcodeCard'); hide('resultsCard'); hide('chartCard');
     allResults = []; allStats = [];
+    selectedBarcodes.clear(); selectedMotifKeys.clear();
 }
 
 // ── Analysis ──────────────────────────────────────────────────────────────────
@@ -622,10 +647,12 @@ async function runAnalysis() {
     }
 
     setProgress('Done', 100, '');
+    initFilters();
     renderStats();
     renderBarcodeTable();
     renderTable();
     renderChart();
+    renderFilterSummary();
     show('statsCard'); show('resultsCard'); show('chartCard');
 }
 
@@ -920,6 +947,96 @@ async function parseFastqPlain(raw, needId, onRead, onProgress) {
     onProgress(1, readCount);
 }
 
+// ── Filter helpers ────────────────────────────────────────────────────────────
+function motifKey(r) {
+    return r.sample + '\x00' + r.barcode + '\x00' + r.motif;
+}
+
+function initFilters() {
+    selectedBarcodes  = new Set(allResults.map(r => r.barcode));
+    selectedMotifKeys = new Set(allResults.map(r => motifKey(r)));
+}
+
+function getFilteredResults() {
+    return allResults.filter(r => {
+        if (barcodeActive && !selectedBarcodes.has(r.barcode)) return false;
+        return selectedMotifKeys.has(motifKey(r));
+    });
+}
+
+function applyFilters() {
+    renderTable();
+    renderChart();
+    renderFilterSummary();
+}
+
+// Barcode checkbox callbacks
+function onBarcodeCheck(cb) {
+    if (cb.checked) selectedBarcodes.add(cb.value);
+    else selectedBarcodes.delete(cb.value);
+    const allCbs  = [...document.querySelectorAll('.barcode-chk')];
+    const hdrCb   = document.getElementById('barcodeSelectAll');
+    if (hdrCb) {
+        hdrCb.checked       = allCbs.every(c => c.checked);
+        hdrCb.indeterminate = !hdrCb.checked && allCbs.some(c => c.checked);
+    }
+    applyFilters();
+}
+function toggleAllBarcodes(el) {
+    document.querySelectorAll('.barcode-chk').forEach(cb => {
+        cb.checked = el.checked;
+        if (el.checked) selectedBarcodes.add(cb.value);
+        else selectedBarcodes.delete(cb.value);
+    });
+    applyFilters();
+}
+
+// Motif checkbox callbacks
+function onMotifCheck(cb) {
+    if (cb.checked) selectedMotifKeys.add(cb.value);
+    else selectedMotifKeys.delete(cb.value);
+    const allCbs  = [...document.querySelectorAll('.motif-chk')];
+    const hdrCb   = document.getElementById('motifSelectAll');
+    if (hdrCb) {
+        hdrCb.checked       = allCbs.every(c => c.checked);
+        hdrCb.indeterminate = !hdrCb.checked && allCbs.some(c => c.checked);
+    }
+    renderChart();
+    renderFilterSummary();
+}
+function toggleAllMotifs(el) {
+    document.querySelectorAll('.motif-chk').forEach(cb => {
+        cb.checked = el.checked;
+        if (el.checked) selectedMotifKeys.add(cb.value);
+        else selectedMotifKeys.delete(cb.value);
+    });
+    renderChart();
+    renderFilterSummary();
+}
+
+// Retained-reads summary
+function renderFilterSummary() {
+    const filtered = getFilteredResults();
+    const sampleMap = new Map();
+    for (const r of allResults) {
+        const e = sampleMap.get(r.sample) || { total: 0, retained: 0 };
+        e.total += r.occurrence;
+        sampleMap.set(r.sample, e);
+    }
+    for (const r of filtered) {
+        const e = sampleMap.get(r.sample);
+        if (e) e.retained += r.occurrence;
+    }
+    document.getElementById('filterSummaryBody').innerHTML =
+        [...sampleMap.entries()].map(([sample, e]) => `<tr>
+            <td>${sample}</td>
+            <td class="num-cell">${fmtN(e.total)}</td>
+            <td class="num-cell hi">${fmtN(e.retained)}</td>
+            <td class="num-cell">${e.total > 0 ? (e.retained / e.total * 100).toFixed(1) : '—'}%</td>
+        </tr>`).join('');
+    document.getElementById('filterSummaryWrap').style.display = '';
+}
+
 // ── Barcode summary table ─────────────────────────────────────────────────────
 function renderBarcodeTable() {
     if (!barcodeActive) { hide('barcodeCard'); return; }
@@ -933,12 +1050,23 @@ function renderBarcodeTable() {
     }
     const total = [...barcodeMap.values()].reduce((s, e) => s + e.reads, 0);
     const rows  = [...barcodeMap.entries()].sort((a, b) => b[1].reads - a[1].reads);
-    document.getElementById('barcodeTbody').innerHTML = rows.map(([bc, e]) => `<tr>
-        <td class="motif-cell">${bc || '(none)'}</td>
-        <td class="num-cell hi">${fmtN(e.reads)}</td>
-        <td class="num-cell">${fmtN(e.motifs)}</td>
-        <td class="num-cell">${total > 0 ? (e.reads / total * 100).toFixed(1) : '—'}%</td>
-    </tr>`).join('');
+    document.getElementById('barcodeTbody').innerHTML = rows.map(([bc, e]) => {
+        const checked  = selectedBarcodes.has(bc) ? 'checked' : '';
+        const safeVal  = bc.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+        return `<tr>
+            <td class="chk-col"><input type="checkbox" class="barcode-chk" value="${safeVal}" ${checked} onchange="onBarcodeCheck(this)"></td>
+            <td class="motif-cell">${bc || '(none)'}</td>
+            <td class="num-cell hi">${fmtN(e.reads)}</td>
+            <td class="num-cell">${fmtN(e.motifs)}</td>
+            <td class="num-cell">${total > 0 ? (e.reads / total * 100).toFixed(1) : '—'}%</td>
+        </tr>`;
+    }).join('');
+    // Sync select-all header checkbox
+    const allChk = document.getElementById('barcodeSelectAll');
+    if (allChk) {
+        allChk.checked       = rows.every(([bc]) => selectedBarcodes.has(bc));
+        allChk.indeterminate = !allChk.checked && rows.some(([bc]) => selectedBarcodes.has(bc));
+    }
     show('barcodeCard');
 }
 
@@ -981,30 +1109,50 @@ function sortBy(field) {
 
 function renderTable() {
     const q = (document.getElementById('searchInput').value || '').toLowerCase();
-    let rows = allResults.filter(r =>
-        !q || r.motif.toLowerCase().includes(q) || r.sample.toLowerCase().includes(q)
-    );
+    let rows = allResults.filter(r => {
+        // Hide rows whose barcode is deselected
+        if (barcodeActive && !selectedBarcodes.has(r.barcode)) return false;
+        // Text search
+        if (!q) return true;
+        return r.motif.toLowerCase().includes(q) || r.sample.toLowerCase().includes(q) ||
+               (r.barcode && r.barcode.toLowerCase().includes(q));
+    });
     rows.sort((a, b) => sortDir * (a[sortField] > b[sortField] ? 1 : a[sortField] < b[sortField] ? -1 : 0));
 
     document.getElementById('resTable').classList.toggle('barcode-active', barcodeActive);
-    document.getElementById('resTbody').innerHTML = rows.map(r => `<tr>
-        <td>${r.sample}</td>
-        <td class="barcode-col motif-cell">${r.barcode}</td>
-        <td class="motif-cell">${r.motif}</td>
-        <td class="num-cell hi">${fmtN(r.occurrence)}</td>
-        <td class="num-cell">${fmtN(r.readsEdited)}</td>
-        <td class="num-cell">${r.pctEdited.toFixed(1)}%</td>
-        <td class="num-cell hi">${r.score.toFixed(2)}</td>
-    </tr>`).join('');
+    document.getElementById('resTbody').innerHTML = rows.map(r => {
+        const mk      = motifKey(r);
+        const checked = selectedMotifKeys.has(mk) ? 'checked' : '';
+        const safeKey = mk.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+        return `<tr>
+            <td class="chk-col"><input type="checkbox" class="motif-chk" value="${safeKey}" ${checked} onchange="onMotifCheck(this)"></td>
+            <td>${r.sample}</td>
+            <td class="barcode-col motif-cell">${r.barcode}</td>
+            <td class="motif-cell">${r.motif}</td>
+            <td class="num-cell hi">${fmtN(r.occurrence)}</td>
+            <td class="num-cell">${fmtN(r.readsEdited)}</td>
+            <td class="num-cell">${r.pctEdited.toFixed(1)}%</td>
+            <td class="num-cell hi">${r.score.toFixed(2)}</td>
+        </tr>`;
+    }).join('');
+
+    // Sync select-all header checkbox for motifs
+    const allCbs  = [...document.querySelectorAll('.motif-chk')];
+    const hdrCb   = document.getElementById('motifSelectAll');
+    if (hdrCb) {
+        hdrCb.checked       = allCbs.length > 0 && allCbs.every(c => c.checked);
+        hdrCb.indeterminate = !hdrCb.checked && allCbs.some(c => c.checked);
+    }
 }
 
 // ── Chart ─────────────────────────────────────────────────────────────────────
 function renderChart() {
+    const filtered = getFilteredResults();
     const groupKey = r => barcodeActive && r.barcode ? `${r.sample} [${r.barcode}]` : r.sample;
-    const groups   = [...new Set(allResults.map(groupKey))];
+    const groups   = [...new Set(filtered.map(groupKey))];
     const datasets = groups.map((g, si) => ({
         label: g,
-        data: allResults.filter(r => groupKey(r) === g).map(r => ({
+        data: filtered.filter(r => groupKey(r) === g).map(r => ({
             x: r.occurrence, y: r.score, motif: r.motif,
         })),
         backgroundColor: SAMPLE_COLORS[si % SAMPLE_COLORS.length],
@@ -1048,7 +1196,7 @@ function renderChart() {
 function downloadCSV() {
     const barcodeHdr = barcodeActive ? ',barcode' : '';
     const header = `sample${barcodeHdr},motif,occurrence,total_edits,reads_edited,pct_edited,score`;
-    const rows = allResults.map(r => {
+    const rows = getFilteredResults().map(r => {
         const parts = [r.sample];
         if (barcodeActive) parts.push(r.barcode);
         parts.push(r.motif, r.occurrence, r.totalEdits, r.readsEdited,
