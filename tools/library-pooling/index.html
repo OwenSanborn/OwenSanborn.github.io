@@ -183,6 +183,22 @@
             vertical-align: middle;
         }
 
+        /* Fill-all input in column header */
+        .col-fill-in {
+            display: block;
+            width: 100%;
+            margin-top: 5px;
+            padding: 3px 6px;
+            background: rgba(26, 27, 38, 0.6);
+            border: 1px solid rgba(107, 155, 209, 0.18);
+            border-radius: 3px;
+            color: #A8B2D1;
+            font-size: 0.75rem;
+            font-weight: 300;
+        }
+        .col-fill-in::placeholder { color: rgba(107, 155, 209, 0.28); font-style: italic; }
+        .col-fill-in:focus { outline: none; border-color: rgba(107, 155, 209, 0.5); color: #E6EDF3; }
+
         /* Column paste button */
         .col-paste-btn {
             background: none;
@@ -300,7 +316,7 @@
         @media print {
             body { background: white !important; color: #111 !important; }
             .topnav, .controls-row, .footer, .remove-row,
-            .col-paste-btn, .mode-toggle { display: none !important; }
+            .col-paste-btn, .col-fill-in, .mode-toggle { display: none !important; }
             .container { padding: 16px; max-width: none; }
             h1 { color: #111; font-size: 1.6rem; }
             .subtitle { color: #444; }
@@ -509,15 +525,22 @@
         const paste = (field, tip) =>
             `<button class="col-paste-btn" onclick="pasteColumn('${field}')" title="${tip}">📋</button>`;
 
+        const fill = (field, type, step, min) =>
+            `<input class="col-fill-in" type="${type}" placeholder="fill all → Enter"
+                step="${step}" min="${min}"
+                onkeydown="if(event.key==='Enter'&&this.value!==''){fillColumn('${field}',this.value);this.value='';this.blur()}">`;
+
         const gbCols = mode === 'unequal' ? `
-            <th>Target Gb ${paste('gb', 'Paste target Gb values (one per line)')}</th>
+            <th>Target Gb ${paste('gb', 'Paste target Gb values (one per line)')}
+                ${fill('gb','number','0.5','0')}</th>
             <th class="col-calc">% of Pool</th>` : '';
 
         document.getElementById('tHead').innerHTML = `<tr>
             <th style="width:26px"></th>
             <th>Sample ID ${paste('name', 'Paste sample names (one per line)')}</th>
             <th>Conc (ng/µL) ${paste('conc', 'Paste concentrations (one per line)')}</th>
-            <th>Size (bp) ${paste('size', 'Paste library sizes (one per line)')}</th>
+            <th>Size (bp) ${paste('size', 'Paste library sizes (one per line)')}
+                ${fill('size','number','10','50')}</th>
             ${gbCols}
             <th class="col-calc">Molarity (nM)</th>
             <th class="col-calc">Volume (µL)</th>
@@ -677,6 +700,12 @@
 
         vals.forEach((val, i) => { rows[i][field] = val; });
 
+        fullRender();
+    }
+
+    // ── Fill column ───────────────────────────────────────────────────────────
+    function fillColumn(field, value) {
+        rows.forEach(r => { r[field] = value; });
         fullRender();
     }
 
