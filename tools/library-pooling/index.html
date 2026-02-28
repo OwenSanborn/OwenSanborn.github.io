@@ -330,7 +330,8 @@
             thead th.col-calc { color: #555 !important; }
             tbody td { border: 1px solid #ddd !important; color: #333 !important; }
             tr.empty-row { display: none !important; }
-            .tbl-in { background: transparent !important; border: none !important; color: #111 !important; font-family: inherit; padding: 2px 0; }
+            .tbl-in { display: none !important; }
+            .print-text { white-space: normal; word-break: break-word; font-size: 0.88rem; color: #111; }
             td.calc     { color: #333 !important; }
             td.calc-vol { color: #111 !important; }
             td.st-ok    { color: #1a6b3a !important; }
@@ -715,6 +716,20 @@
             .replace(/&/g,'&amp;').replace(/</g,'&lt;')
             .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
+
+    // ── Print: swap inputs → readable spans ──────────────────────────────────
+    window.addEventListener('beforeprint', () => {
+        document.querySelectorAll('#tBody tr:not(.empty-row) .tbl-in').forEach(inp => {
+            const span = document.createElement('span');
+            span.className = 'print-text';
+            span.textContent = inp.value;
+            inp.insertAdjacentElement('afterend', span);
+        });
+    });
+
+    window.addEventListener('afterprint', () => {
+        document.querySelectorAll('#tBody .print-text').forEach(s => s.remove());
+    });
 
     // ── Start ─────────────────────────────────────────────────────────────────
     init();
