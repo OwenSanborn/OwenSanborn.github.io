@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Library Pooling Calculator | Owen Sanborn</title>
     <link rel="icon" type="image/png" href="/favicon.png" />
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -64,14 +63,12 @@
             margin-bottom: 24px;
         }
         .card h3 {
-            color: #E6EDF3;
-            font-size: 1rem;
-            font-weight: 400;
-            margin-bottom: 16px;
-            letter-spacing: 0.02em;
+            letter-spacing: 0.06em;
             text-transform: uppercase;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
+            font-weight: 400;
             color: #6B9BD1;
+            margin-bottom: 16px;
         }
 
         /* Settings */
@@ -186,6 +183,21 @@
             vertical-align: middle;
         }
 
+        /* Column paste button */
+        .col-paste-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 0.72rem;
+            opacity: 0.35;
+            padding: 0 1px 0 3px;
+            vertical-align: middle;
+            line-height: 1;
+            transition: opacity 0.15s;
+            color: inherit;
+        }
+        .col-paste-btn:hover { opacity: 1; }
+
         /* Inputs inside table */
         .tbl-in {
             width: 100%;
@@ -201,21 +213,28 @@
             outline: none;
             border-color: rgba(107, 155, 209, 0.45);
         }
-        input.tbl-in[type="text"] { min-width: 110px; }
+        input.tbl-in[type="text"]   { min-width: 110px; }
         input.tbl-in[type="number"] { min-width: 70px; }
 
         /* Calculated cells */
-        td.calc { color: #A8B2D1; }
+        td.calc     { color: #A8B2D1; }
         td.calc-vol { color: #E6EDF3; font-weight: 400; }
 
-        /* Status */
+        /* Status — nowrap keeps each row at one line height */
+        td.st-ok, td.st-low, td.st-high, td.st-none { white-space: nowrap; }
         td.st-ok   { color: #3CB371; font-weight: 400; }
         td.st-low  { color: #F5A623; font-weight: 400; }
         td.st-high { color: #E06C75; font-weight: 400; }
         td.st-none { color: rgba(107, 155, 209, 0.3); }
 
         /* Row number */
-        td.rownum { color: rgba(107, 155, 209, 0.35); font-size: 0.75rem; text-align: right; width: 26px; padding-right: 4px; }
+        td.rownum {
+            color: rgba(107, 155, 209, 0.35);
+            font-size: 0.75rem;
+            text-align: right;
+            width: 26px;
+            padding-right: 4px;
+        }
 
         /* Remove button */
         .remove-row {
@@ -250,15 +269,11 @@
             line-height: 1.2;
         }
         .sum-val.warn { color: #E06C75; }
-        .sum-val.caution { color: #F5A623; }
         .sum-lbl {
             font-size: 0.75rem;
             color: #A8B2D1;
             margin-top: 3px;
         }
-
-        /* Chart */
-        .chart-wrapper { position: relative; }
 
         /* Gb note */
         .gb-note {
@@ -267,36 +282,6 @@
             font-weight: 300;
             margin-top: 12px;
         }
-
-        /* Import */
-        .import-hint {
-            color: #6B7CA0;
-            font-size: 0.8rem;
-            font-weight: 300;
-            margin-bottom: 10px;
-            line-height: 1.5;
-        }
-        .import-hint code {
-            background: rgba(107, 155, 209, 0.1);
-            padding: 1px 5px;
-            border-radius: 3px;
-            font-size: 0.75rem;
-        }
-        .import-textarea {
-            width: 100%;
-            height: 110px;
-            padding: 10px;
-            background: #1A1B26;
-            border: 1px solid rgba(107, 155, 209, 0.2);
-            border-radius: 4px;
-            color: #E6EDF3;
-            font-family: monospace;
-            font-size: 0.82rem;
-            resize: vertical;
-            margin-bottom: 10px;
-        }
-        .import-textarea:focus { outline: none; border-color: rgba(107, 155, 209, 0.45); }
-        .import-row { display: flex; gap: 8px; align-items: center; }
 
         /* Footer */
         .footer {
@@ -314,8 +299,8 @@
         /* Print */
         @media print {
             body { background: white !important; color: #111 !important; }
-            .topnav, .controls-row, .import-section, .footer,
-            .remove-row, .chart-section { display: none !important; }
+            .topnav, .controls-row, .footer, .remove-row,
+            .col-paste-btn, .mode-toggle { display: none !important; }
             .container { padding: 16px; max-width: none; }
             h1 { color: #111; font-size: 1.6rem; }
             .subtitle { color: #444; }
@@ -328,15 +313,15 @@
             thead th { background: #efefef !important; color: #333 !important; border: 1px solid #ccc !important; font-size: 0.75rem; }
             thead th.col-calc { color: #555 !important; }
             tbody td { border: 1px solid #ddd !important; color: #333 !important; }
+            tr.empty-row { display: none !important; }
             .tbl-in { background: transparent !important; border: none !important; color: #111 !important; font-family: inherit; padding: 2px 0; }
-            td.calc { color: #333 !important; }
+            td.calc     { color: #333 !important; }
             td.calc-vol { color: #111 !important; }
-            td.st-ok   { color: #1a6b3a !important; }
-            td.st-low  { color: #a05c00 !important; }
-            td.st-high { color: #b50019 !important; }
-            td.st-none { color: #aaa !important; }
-            td.rownum  { color: #aaa !important; }
-            .mode-toggle { display: none !important; }
+            td.st-ok    { color: #1a6b3a !important; }
+            td.st-low   { color: #a05c00 !important; }
+            td.st-high  { color: #b50019 !important; }
+            td.st-none  { color: #aaa !important; }
+            td.rownum   { color: #aaa !important; }
         }
 
         @media (max-width: 700px) {
@@ -412,31 +397,6 @@
         <h3>Summary</h3>
         <div class="summary-grid" id="summaryGrid"></div>
     </div>
-
-    <!-- Chart -->
-    <div class="card chart-section" id="chartCard" style="display:none">
-        <h3>Volume per Library (µL)</h3>
-        <div class="chart-wrapper" id="chartWrapper">
-            <canvas id="poolChart"></canvas>
-        </div>
-    </div>
-
-    <!-- Import -->
-    <div class="card import-section">
-        <h3>Import from Clipboard</h3>
-        <p class="import-hint">
-            Paste tab-separated data copied from a spreadsheet. Expected columns (in order):<br>
-            <code>Sample ID</code> &nbsp;·&nbsp; <code>Concentration (ng/µL)</code> &nbsp;·&nbsp; <code>Library Size (bp)</code> &nbsp;·&nbsp; <code>Target Gb</code> (optional, for unequal mode)<br>
-            Header rows are detected and skipped automatically.
-        </p>
-        <textarea class="import-textarea" id="importArea" placeholder="SampleA	1.84	263	10
-SampleB	1.27	263	5
-SampleC	2.08	263	10"></textarea>
-        <div class="import-row">
-            <button class="btn" onclick="importFromText()">Import</button>
-            <button class="btn" onclick="pasteFromClipboard()">Paste from Clipboard</button>
-        </div>
-    </div>
 </div>
 
 <footer class="footer">
@@ -448,36 +408,18 @@ SampleC	2.08	263	10"></textarea>
     let rows = [];
     let nextId = 1;
     let mode = 'equal';
-    let lastStructureKey = '';  // track when full rebuild is needed
-    let poolChart = null;
 
-    const COLORS = [
-        'rgba(107,155,209,0.75)', 'rgba(184,149,106,0.75)', 'rgba(60,179,113,0.75)',
-        'rgba(168,178,209,0.75)', 'rgba(245,166,35,0.75)',  'rgba(156,39,176,0.75)',
-        'rgba(224,108,117,0.75)', 'rgba(79,195,247,0.75)',  'rgba(174,213,129,0.75)',
-        'rgba(255,138,101,0.75)', 'rgba(186,104,200,0.75)', 'rgba(77,182,172,0.75)',
-        'rgba(240,98,146,0.75)',  'rgba(121,134,203,0.75)', 'rgba(255,213,79,0.75)',
-        'rgba(144,164,174,0.75)', 'rgba(161,136,127,0.75)', 'rgba(128,203,196,0.75)',
-        'rgba(206,147,216,0.75)', 'rgba(255,204,128,0.75)', 'rgba(128,222,234,0.75)',
-        'rgba(239,154,154,0.75)', 'rgba(197,225,165,0.75)', 'rgba(128,203,196,0.75)',
-    ];
-
-    // ── Initialization ────────────────────────────────────────────────────────
+    // ── Init ──────────────────────────────────────────────────────────────────
     function init() {
         for (let i = 0; i < 12; i++) pushRow();
-        setupSettingListeners();
-        fullRender();
-    }
-
-    function setupSettingListeners() {
         ['poolNM', 'totalVolume', 'minVol', 'maxVol'].forEach(id => {
             document.getElementById(id).addEventListener('input', () => {
                 const results = calcAll();
                 updateCalcCells(results);
                 renderSummary(results);
-                renderChart(results);
             });
         });
+        fullRender();
     }
 
     // ── Row management ────────────────────────────────────────────────────────
@@ -485,15 +427,8 @@ SampleC	2.08	263	10"></textarea>
         rows.push({ id: nextId++, name, conc, size, gb });
     }
 
-    function addRow() {
-        pushRow();
-        fullRender();
-    }
-
-    function addRows(n) {
-        for (let i = 0; i < n; i++) pushRow();
-        fullRender();
-    }
+    function addRow()    { pushRow(); fullRender(); }
+    function addRows(n)  { for (let i = 0; i < n; i++) pushRow(); fullRender(); }
 
     function removeRow(id) {
         rows = rows.filter(r => r.id !== id);
@@ -503,8 +438,7 @@ SampleC	2.08	263	10"></textarea>
 
     function clearTable() {
         if (!confirm('Clear all sample data?')) return;
-        rows = [];
-        nextId = 1;
+        rows = []; nextId = 1;
         for (let i = 0; i < 12; i++) pushRow();
         fullRender();
     }
@@ -532,8 +466,7 @@ SampleC	2.08	263	10"></textarea>
     function calcMolarity(conc, size) {
         const c = parseFloat(conc);
         if (isNaN(c) || c <= 0) return null;
-        const s = parseFloat(size) || 450;
-        return c * 1e6 / (660 * s);
+        return c * 1e6 / (660 * (parseFloat(size) || 450));
     }
 
     function calcAll() {
@@ -545,45 +478,46 @@ SampleC	2.08	263	10"></textarea>
             return rows.map(row => {
                 const mol = calcMolarity(row.conc, row.size);
                 if (!mol) return { mol: null, vol: null, pct: null };
-                const vol = N > 0 ? (poolNM * totalVolume / N) / mol : null;
-                const pct = N > 0 ? 100 / N : null;
-                return { mol, vol, pct };
+                return {
+                    mol,
+                    vol: N > 0 ? (poolNM * totalVolume / N) / mol : null,
+                    pct: N > 0 ? 100 / N : null,
+                };
             });
         } else {
-            // Unequal by Target Gb
             let totalGb = 0;
             filled.forEach(r => { totalGb += parseFloat(r.gb) || 0; });
-
             return rows.map(row => {
                 const mol = calcMolarity(row.conc, row.size);
                 if (!mol || totalGb === 0) return { mol: mol || null, vol: null, pct: null };
-                const gb = parseFloat(row.gb) || 0;
+                const gb  = parseFloat(row.gb) || 0;
                 const pct = (gb / totalGb) * 100;
-                const vol = pct / 100 * poolNM * totalVolume / mol;
-                return { mol, vol, pct };
+                return { mol, vol: pct / 100 * poolNM * totalVolume / mol, pct };
             });
         }
     }
 
-    // ── Render: full rebuild ──────────────────────────────────────────────────
+    // ── Full render ───────────────────────────────────────────────────────────
     function fullRender() {
-        lastStructureKey = mode + '|' + rows.map(r => r.id).join(',');
         const results = calcAll();
         renderHead();
         renderBodyFull(results);
         renderSummary(results);
-        renderChart(results);
     }
 
     function renderHead() {
-        const gbCols = mode === 'unequal'
-            ? '<th>Target Gb</th><th class="col-calc">% of Pool</th>'
-            : '';
+        const paste = (field, tip) =>
+            `<button class="col-paste-btn" onclick="pasteColumn('${field}')" title="${tip}">📋</button>`;
+
+        const gbCols = mode === 'unequal' ? `
+            <th>Target Gb ${paste('gb', 'Paste target Gb values (one per line)')}</th>
+            <th class="col-calc">% of Pool</th>` : '';
+
         document.getElementById('tHead').innerHTML = `<tr>
             <th style="width:26px"></th>
-            <th>Sample ID</th>
-            <th>Conc (ng/µL)</th>
-            <th>Size (bp)</th>
+            <th>Sample ID ${paste('name', 'Paste sample names (one per line)')}</th>
+            <th>Conc (ng/µL) ${paste('conc', 'Paste concentrations (one per line)')}</th>
+            <th>Size (bp) ${paste('size', 'Paste library sizes (one per line)')}</th>
             ${gbCols}
             <th class="col-calc">Molarity (nM)</th>
             <th class="col-calc">Volume (µL)</th>
@@ -593,36 +527,23 @@ SampleC	2.08	263	10"></textarea>
     }
 
     function renderBodyFull(results) {
-        const tbody = document.getElementById('tBody');
-        const { minVol, maxVol } = getSettings();
-
-        tbody.innerHTML = rows.map((row, i) => {
-            const res = results[i];
-            const id = row.id;
+        document.getElementById('tBody').innerHTML = rows.map((row, i) => {
+            const id      = row.id;
+            const isEmpty = !row.name && !row.conc;
 
             const gbCols = mode === 'unequal' ? `
-                <td><input type="number" class="tbl-in" data-id="${id}" data-field="gb"
-                    value="${row.gb}" min="0" step="0.5"
+                <td><input type="number" class="tbl-in" value="${row.gb}" min="0" step="0.5"
                     oninput="handleInput(${id},'gb',this.value)" placeholder="Gb"></td>
-                <td class="calc" id="pct-${id}">—</td>
-            ` : '';
+                <td class="calc" id="pct-${id}">—</td>` : '';
 
-            const sizeVal = row.size || '';
-
-            return `<tr>
+            return `<tr${isEmpty ? ' class="empty-row"' : ''}>
                 <td class="rownum">${i + 1}</td>
-                <td><input type="text" class="tbl-in" data-id="${id}" data-field="name"
-                    value="${escHtml(row.name)}"
-                    oninput="handleInput(${id},'name',this.value)"
-                    placeholder="Sample name"></td>
-                <td><input type="number" class="tbl-in" data-id="${id}" data-field="conc"
-                    value="${row.conc}" min="0" step="0.1"
-                    oninput="handleInput(${id},'conc',this.value)"
-                    placeholder="ng/µL"></td>
-                <td><input type="number" class="tbl-in" data-id="${id}" data-field="size"
-                    value="${sizeVal}" min="50" step="10"
-                    oninput="handleInput(${id},'size',this.value)"
-                    placeholder="450"></td>
+                <td><input type="text" class="tbl-in" value="${escHtml(row.name)}"
+                    oninput="handleInput(${id},'name',this.value)" placeholder="Sample name"></td>
+                <td><input type="number" class="tbl-in" value="${row.conc}" min="0" step="0.1"
+                    oninput="handleInput(${id},'conc',this.value)" placeholder="ng/µL"></td>
+                <td><input type="number" class="tbl-in" value="${row.size}" min="50" step="10"
+                    oninput="handleInput(${id},'size',this.value)" placeholder="450"></td>
                 ${gbCols}
                 <td class="calc" id="mol-${id}">—</td>
                 <td class="calc-vol" id="vol-${id}">—</td>
@@ -634,44 +555,27 @@ SampleC	2.08	263	10"></textarea>
         updateCalcCells(results);
     }
 
-    // ── Render: update only calculated cells ──────────────────────────────────
+    // ── Update only calculated cells (no DOM rebuild) ─────────────────────────
     function updateCalcCells(results) {
         const { minVol, maxVol } = getSettings();
-
         rows.forEach((row, i) => {
-            const res = results[i];
-            const id = row.id;
+            const res   = results[i];
+            const id    = row.id;
+            const molEl = document.getElementById(`mol-${id}`);
+            const volEl = document.getElementById(`vol-${id}`);
+            const stEl  = document.getElementById(`st-${id}`);
+            const pctEl = document.getElementById(`pct-${id}`);
+            if (!molEl) return;
 
-            const molEl  = document.getElementById(`mol-${id}`);
-            const volEl  = document.getElementById(`vol-${id}`);
-            const stEl   = document.getElementById(`st-${id}`);
-            const pctEl  = document.getElementById(`pct-${id}`);
+            molEl.textContent = res.mol != null
+                ? res.mol.toFixed(2) + (!row.size ? '*' : '')
+                : '—';
+            molEl.title = (!row.size && res.mol) ? 'Using default size 450 bp' : '';
 
-            if (!molEl) return;  // row not yet in DOM
+            volEl.textContent = res.vol != null ? res.vol.toFixed(2) : '—';
 
-            // Molarity
-            if (res.mol != null) {
-                const sizeUsedDefault = !row.size;
-                molEl.textContent = res.mol.toFixed(2) + (sizeUsedDefault ? '*' : '');
-                molEl.title = sizeUsedDefault ? 'Using default size 450 bp' : '';
-            } else {
-                molEl.textContent = '—';
-                molEl.title = '';
-            }
+            if (pctEl) pctEl.textContent = res.pct != null ? res.pct.toFixed(1) + '%' : '—';
 
-            // Volume
-            if (res.vol != null) {
-                volEl.textContent = res.vol.toFixed(2);
-            } else {
-                volEl.textContent = '—';
-            }
-
-            // % of pool
-            if (pctEl) {
-                pctEl.textContent = res.pct != null ? res.pct.toFixed(1) + '%' : '—';
-            }
-
-            // Status
             stEl.className = 'st-none';
             stEl.textContent = '—';
             if (res.vol != null) {
@@ -687,22 +591,28 @@ SampleC	2.08	263	10"></textarea>
         const row = rows.find(r => r.id === id);
         if (!row) return;
         row[field] = value;
+
+        // Keep empty-row class in sync without a full rebuild
+        const inp = document.querySelector(`#tBody [data-rowid="${id}"]`);
+        const tr = document.querySelector(`#tBody td input[oninput*="${id},'name'"]`)?.closest('tr')
+                ?? document.querySelector(`#tBody td input[oninput*="${id},'conc'"]`)?.closest('tr');
+        if (tr) tr.classList.toggle('empty-row', !row.name && !row.conc);
+
         const results = calcAll();
         updateCalcCells(results);
         renderSummary(results);
-        renderChart(results);
     }
 
     // ── Summary ───────────────────────────────────────────────────────────────
     function renderSummary(results) {
         const { totalVolume, minVol, maxVol } = getSettings();
-        const filled = results.filter(r => r.vol != null);
-        const N = filled.length;
+        const filled    = results.filter(r => r.vol != null);
+        const N         = filled.length;
         const sampleVol = filled.reduce((s, r) => s + r.vol, 0);
         const waterVol  = totalVolume - sampleVol;
-        const nLow   = filled.filter(r => r.vol < minVol).length;
-        const nHigh  = filled.filter(r => r.vol > maxVol).length;
-        const nIssue = nLow + nHigh;
+        const nLow      = filled.filter(r => r.vol < minVol).length;
+        const nHigh     = filled.filter(r => r.vol > maxVol).length;
+        const nIssue    = nLow + nHigh;
 
         let issueClass = '', issueText = 'All OK';
         if (nIssue > 0) {
@@ -713,16 +623,11 @@ SampleC	2.08	263	10"></textarea>
             issueText = parts.join(', ');
         }
 
-        let waterClass = waterVol < 0 ? 'warn' : '';
-        let waterLbl = 'Water to add (µL)';
-        if (waterVol < 0) waterLbl += ' ⚠';
-
-        const totalGbDisplay = mode === 'unequal'
+        const totalGbItem = mode === 'unequal'
             ? `<div class="sum-item">
                    <div class="sum-val">${rows.filter(r=>parseFloat(r.conc)>0).reduce((s,r)=>s+(parseFloat(r.gb)||0),0).toFixed(1)}</div>
                    <div class="sum-lbl">Total target Gb</div>
-               </div>`
-            : '';
+               </div>` : '';
 
         document.getElementById('summaryGrid').innerHTML = `
             <div class="sum-item">
@@ -734,142 +639,52 @@ SampleC	2.08	263	10"></textarea>
                 <div class="sum-lbl">Total sample volume (µL)</div>
             </div>
             <div class="sum-item">
-                <div class="sum-val ${waterClass}">${waterVol.toFixed(1)}</div>
-                <div class="sum-lbl">${waterLbl}</div>
+                <div class="sum-val ${waterVol < 0 ? 'warn' : ''}">${waterVol.toFixed(1)}</div>
+                <div class="sum-lbl">Water to add (µL)${waterVol < 0 ? ' ⚠' : ''}</div>
             </div>
             <div class="sum-item">
                 <div class="sum-val ${issueClass}">${issueText}</div>
                 <div class="sum-lbl">Volume validation</div>
             </div>
-            ${totalGbDisplay}
-        `;
+            ${totalGbItem}`;
     }
 
-    // ── Chart ─────────────────────────────────────────────────────────────────
-    function renderChart(results) {
-        const { minVol, maxVol } = getSettings();
-        const chartCard = document.getElementById('chartCard');
-
-        const data = rows.map((row, i) => ({
-            label: row.name || `Sample ${i + 1}`,
-            vol: results[i].vol,
-            colorIdx: i,
-            low: results[i].vol != null && results[i].vol < minVol,
-            high: results[i].vol != null && results[i].vol > maxVol,
-        })).filter(d => d.vol != null);
-
-        if (data.length === 0) {
-            chartCard.style.display = 'none';
-            return;
-        }
-        chartCard.style.display = 'block';
-
-        const labels  = data.map(d => d.label);
-        const volumes = data.map(d => d.vol);
-        const colors  = data.map(d =>
-            (d.low || d.high) ? 'rgba(224,108,117,0.65)' : COLORS[d.colorIdx % COLORS.length]
-        );
-
-        // Dynamic height
-        document.getElementById('chartWrapper').style.height =
-            Math.max(200, data.length * 26 + 60) + 'px';
-
-        Chart.defaults.color = '#A8B2D1';
-        Chart.defaults.borderColor = 'rgba(107,155,209,0.12)';
-
-        if (poolChart) {
-            poolChart.data.labels = labels;
-            poolChart.data.datasets[0].data = volumes;
-            poolChart.data.datasets[0].backgroundColor = colors;
-            poolChart.update('none');
-        } else {
-            poolChart = new Chart(document.getElementById('poolChart'), {
-                type: 'bar',
-                data: { labels, datasets: [{ label: 'Volume (µL)', data: volumes, backgroundColor: colors, borderWidth: 0 }] },
-                options: {
-                    indexAxis: 'y',
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    animation: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: {
-                            title: { display: true, text: 'Volume (µL)', color: '#A8B2D1' },
-                            ticks: { color: '#A8B2D1' },
-                            grid: { color: 'rgba(107,155,209,0.08)' },
-                            min: 0,
-                        },
-                        y: {
-                            ticks: { color: '#A8B2D1', font: { size: 11 } },
-                            grid: { color: 'rgba(107,155,209,0.04)' },
-                        },
-                    },
-                },
-            });
-        }
-    }
-
-    // ── Import ────────────────────────────────────────────────────────────────
-    function importFromText() {
-        const text = document.getElementById('importArea').value.trim();
-        if (!text) return;
-        doImport(text);
-    }
-
-    async function pasteFromClipboard() {
+    // ── Column paste ──────────────────────────────────────────────────────────
+    async function pasteColumn(field) {
+        let text;
         try {
-            const text = await navigator.clipboard.readText();
-            document.getElementById('importArea').value = text;
-            doImport(text);
+            text = await navigator.clipboard.readText();
         } catch {
-            alert('Could not access clipboard. Please paste your data into the text area and click Import.');
-        }
-    }
-
-    function doImport(text) {
-        const lines = text.trim().split(/\r?\n/).filter(l => l.trim());
-        const newRows = [];
-
-        for (const line of lines) {
-            const parts = line.split('\t').map(p => p.trim());
-            if (!parts.length) continue;
-
-            // Skip header rows
-            const first = parts[0].toLowerCase();
-            if (first.includes('sample') || first.includes('id') || first.includes('name') ||
-                first.includes('conc') || first.includes('library')) continue;
-
-            const name = parts[0] || '';
-            const conc = parts[1] || '';
-            const size = parts[2] || '';
-            const gb   = parts[3] || '1';
-
-            if (name || (conc && parseFloat(conc) > 0)) {
-                newRows.push({ id: nextId++, name, conc, size, gb });
-            }
-        }
-
-        if (newRows.length === 0) {
-            alert('No valid rows found. Check that columns are tab-separated.');
+            alert('Could not read clipboard. Check browser permissions.');
             return;
         }
 
-        // Strip trailing empty rows, then append imported data + a few blank rows
-        rows = rows.filter(r => r.name || parseFloat(r.conc) > 0);
-        rows.push(...newRows);
-        while (rows.length < newRows.length + 4) pushRow();
+        // One value per line; if multi-column, take only the first tab-token
+        let vals = text.trim().split(/\r?\n/)
+            .map(l => l.split('\t')[0].trim())
+            .filter(l => l);
 
-        document.getElementById('importArea').value = '';
+        if (!vals.length) return;
+
+        // Skip header line for numeric fields
+        if (field !== 'name' && isNaN(parseFloat(vals[0]))) {
+            vals = vals.slice(1);
+        }
+        if (!vals.length) return;
+
+        // Expand rows if needed
+        while (rows.length < vals.length) pushRow();
+
+        vals.forEach((val, i) => { rows[i][field] = val; });
+
         fullRender();
     }
 
     // ── Utils ─────────────────────────────────────────────────────────────────
     function escHtml(s) {
         return String(s)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
+            .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
     // ── Start ─────────────────────────────────────────────────────────────────
