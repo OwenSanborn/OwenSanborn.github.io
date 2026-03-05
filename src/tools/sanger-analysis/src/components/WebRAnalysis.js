@@ -41,10 +41,10 @@ const reverseComplement = (seq) => {
 };
 
 // Hairpin patterns for validation
-// Forward: [TN][TN][AG][GN]A repeating (T positions, editing site, and G bleedover all allow N)
-const FWD_HAIRPIN_PATTERN = /TT[AG][GN]A[TN][TN][AG][GN]A[TN][TN][AG][GN]A[TN][TN][AG][GN]A[TN][TN][AG][GN]A[TN][TN][AG][GN]A/;
-// Reverse: T[CN][TC][AN][AN] repeating (rev comp of [TN][TN][AG][GN]A)
-const REV_HAIRPIN_PATTERN = /T[CN][TC][AN][AN]T[CN][TC][AN][AN]T[CN][TC][AN][AN]T[CN][TC][AN][AN]T[CN][TC][AN][AN]T[CN][TC][AN][AN]/;
+// Forward: TT[AGN][GN]A repeating (TT fixed; editing site and bleedover allow N)
+const FWD_HAIRPIN_PATTERN = /TT[AGN][GN]ATT[AGN][GN]ATT[AGN][GN]ATT[AGN][GN]ATT[AGN][GN]ATT[AGN][GN]A/;
+// Reverse: T[CN][TCN]AA repeating (rev comp of TT[AGN][GN]A)
+const REV_HAIRPIN_PATTERN = /T[CN][TCN]AAT[CN][TCN]AAT[CN][TCN]AAT[CN][TCN]AAT[CN][TCN]AAT[CN][TCN]AA/;
 
 const WebRAnalysis = () => {
   const [files, setFiles] = useState([]);
