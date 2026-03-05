@@ -76,9 +76,9 @@ const WebRAnalysis = () => {
   };
 
   const handleMetadataChange = (index, field, value) => {
-    const newMetadata = [...metadata];
-    newMetadata[index][field] = value;
-    setMetadata(newMetadata);
+    setMetadata(prev => prev.map((item, i) =>
+      i === index ? { ...item, [field]: value } : item
+    ));
   };
 
   const processFiles = async () => {
