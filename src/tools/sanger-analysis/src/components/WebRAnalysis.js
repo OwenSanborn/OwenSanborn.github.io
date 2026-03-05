@@ -42,7 +42,7 @@ const reverseComplement = (seq) => {
 
 // Hairpin patterns for validation
 // Forward: [TN][TN][AG][GN]A repeating (T positions, editing site, and G bleedover all allow N)
-const FWD_HAIRPIN_PATTERN = /[TN][TN][AG][GN]A[TN][TN][AG][GN]A[TN][TN][AG][GN]A[TN][TN][AG][GN]A[TN][TN][AG][GN]A[TN][TN][AG][GN]A/;
+const FWD_HAIRPIN_PATTERN = /TT[AG][GN]A[TN][TN][AG][GN]A[TN][TN][AG][GN]A[TN][TN][AG][GN]A[TN][TN][AG][GN]A[TN][TN][AG][GN]A/;
 // Reverse: T[CN][TC][AN][AN] repeating (rev comp of [TN][TN][AG][GN]A)
 const REV_HAIRPIN_PATTERN = /T[CN][TC][AN][AN]T[CN][TC][AN][AN]T[CN][TC][AN][AN]T[CN][TC][AN][AN]T[CN][TC][AN][AN]T[CN][TC][AN][AN]/;
 
@@ -162,7 +162,7 @@ const WebRAnalysis = () => {
 
             sangs.push({
               index: j + 1,
-              baseCall: baseCalls[j],
+              baseCall: (baseCalls[j] || 'N').toUpperCase(),
               aArea,
               cArea,
               gArea,
@@ -188,7 +188,6 @@ const WebRAnalysis = () => {
           const anchor = "CCAATTAAA";
           const sequence = sangsFilt.map(s => s.baseCall).join('');
           console.log(`🧬 Full sequence length: ${sequence.length}`);
-          console.log(`🔍 Filtered sequence: ${sequence}`);
 
           // Try forward hairpin pattern first
           let useSequence = sequence;
