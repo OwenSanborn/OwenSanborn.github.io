@@ -68,7 +68,8 @@ const WebRAnalysis = () => {
     setFiles(validFiles);
     setMetadata(validFiles.map((file) => ({
       fileName: file.name,
-      group: ''
+      group: '',
+      direction: 'fwd'
     })));
     setError(null);
     setResults(null);
@@ -101,12 +102,13 @@ const WebRAnalysis = () => {
           file: files[idx],
           fileName: meta.fileName,
           group: group,
-          replicate: replicateCounts[group]
+          replicate: replicateCounts[group],
+          direction: meta.direction || 'fwd'
         };
       });
 
       for (let i = 0; i < processedData.length; i++) {
-        const { file, fileName, group, replicate } = processedData[i];
+        const { file, fileName, group, replicate, direction } = processedData[i];
 
         setProcessingStatus(`Reading ${fileName} (${i + 1}/${files.length})...`);
 
@@ -189,27 +191,17 @@ const WebRAnalysis = () => {
           const sequence = sangsFilt.map(s => s.baseCall).join('');
           console.log(`🧬 Full sequence length: ${sequence.length}`);
 
-          // Try forward hairpin pattern first
+          // Use explicit direction from metadata
           let useSequence = sequence;
           let useSangsFilt = sangsFilt;
-          let orientation = null;
+          const orientation = direction;
 
-          const fwdMatch = sequence.match(FWD_HAIRPIN_PATTERN);
-          const revMatch = sequence.match(REV_HAIRPIN_PATTERN);
-
-          if (fwdMatch) {
-            console.log(`✅ Forward hairpin found at position ${fwdMatch.index}`);
-            orientation = 'forward';
-          } else if (revMatch) {
-            console.log(`🔄 Reverse hairpin found, reverse complementing sequence...`);
-            orientation = 'reverse';
-            // Reverse complement the sequence
+          if (direction === 'rev') {
+            console.log(`🔄 REV direction selected, reverse complementing sequence...`);
             useSequence = reverseComplement(sequence);
-            // Also need to reverse and complement the trace data
             useSangsFilt = [...sangsFilt].reverse().map(s => ({
               ...s,
               baseCall: reverseComplement(s.baseCall),
-              // Swap A<->T and G<->C trace values
               aArea: s.tArea,
               tArea: s.aArea,
               gArea: s.cArea,
@@ -219,17 +211,8 @@ const WebRAnalysis = () => {
               gPerc: s.cPerc,
               cPerc: s.gPerc
             }));
-            console.log(`🔄 Reverse complemented sequence length: ${useSequence.length}`);
           } else {
-            console.error(`❌ No hairpin pattern found in ${fileName}`);
-            results.push({
-              file: fileName,
-              group: group,
-              replicate: replicate,
-              value: null,
-              error: 'No hairpin pattern found - sequence may be invalid or corrupted'
-            });
-            continue;
+            console.log(`✅ FWD direction selected`);
           }
 
           const anchorPos = useSequence.indexOf(anchor);
@@ -529,8 +512,8 @@ const WebRAnalysis = () => {
                 <tr>
                   <th style={{ color: '#E6EDF3', padding: '0.75rem', borderBottom: '1px solid rgba(107, 155, 209, 0.3)' }}>File</th>
                   <th style={{ color: '#E6EDF3', padding: '0.75rem', borderBottom: '1px solid rgba(107, 155, 209, 0.3)' }}>Group</th>
+                  <th style={{ color: '#E6EDF3', padding: '0.75rem', borderBottom: '1px solid rgba(107, 155, 209, 0.3)' }}>Direction</th>
                   <th style={{ color: '#E6EDF3', padding: '0.75rem', borderBottom: '1px solid rgba(107, 155, 209, 0.3)' }}>Replicate</th>
-                  <th style={{ color: '#E6EDF3', padding: '0.75rem', borderBottom: '1px solid rgba(107, 155, 209, 0.3)' }}>Orientation</th>
                   <th style={{ color: '#E6EDF3', padding: '0.75rem', borderBottom: '1px solid rgba(107, 155, 209, 0.3)' }}>% Editing</th>
                 </tr>
               </thead>
@@ -561,14 +544,30 @@ const WebRAnalysis = () => {
                           onChange={e => handleMetadataChange(idx, 'group', e.target.value)}
                         />
                       </td>
-                      <td style={{ color: '#E6EDF3', padding: '0.5rem' }}>{result?.replicate || ''}</td>
-                      <td style={{
-                        color: hasError ? '#FF6B6B' : '#E6EDF3',
-                        padding: '0.5rem',
-                        fontSize: hasError ? '0.75rem' : 'inherit'
-                      }}>
-                        {hasError ? 'Error' : (result?.orientation || '')}
+                      <td style={{ padding: '0.5rem' }}>
+                        <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                          {['fwd', 'rev'].map(dir => (
+                            <button
+                              key={dir}
+                              onClick={() => handleMetadataChange(idx, 'direction', dir)}
+                              style={{
+                                padding: '3px 10px',
+                                borderRadius: '4px',
+                                border: 'none',
+                                cursor: 'pointer',
+                                fontWeight: '500',
+                                fontSize: '0.8rem',
+                                backgroundColor: meta.direction === dir ? '#6B9BD1' : '#2D2F3D',
+                                color: meta.direction === dir ? '#1A1B26' : '#A8B2D1',
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              {dir.toUpperCase()}
+                            </button>
+                          ))}
+                        </div>
                       </td>
+                      <td style={{ color: '#E6EDF3', padding: '0.5rem' }}>{result?.replicate || ''}</td>
                       <td style={{
                         color: hasError ? '#FF6B6B' : '#E6EDF3',
                         padding: '0.5rem'
