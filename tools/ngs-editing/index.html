@@ -843,6 +843,29 @@ function getBgzipBlockSize(data, offset) {
     return -1;
 }
 
+async function decompressGzipFull(raw) {
+    if (typeof DecompressionStream !== 'undefined') {
+        const ds = new DecompressionStream('gzip');
+        const writer = ds.writable.getWriter();
+        const reader = ds.readable.getReader();
+        writer.write(raw);
+        writer.close();
+        const chunks = [];
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            chunks.push(value);
+        }
+        const total = chunks.reduce((s, c) => s + c.length, 0);
+        const result = new Uint8Array(total);
+        let pos = 0;
+        for (const c of chunks) { result.set(c, pos); pos += c.length; }
+        return result;
+    }
+    // Fallback: pako (works for single-member gzip)
+    return pako.inflate(raw);
+}
+
 async function parseFastq(file, needId, onRead, onProgress) {
     const ab  = await file.arrayBuffer();
     const raw = new Uint8Array(ab);
@@ -855,22 +878,28 @@ async function parseFastq(file, needId, onRead, onProgress) {
 
     // Gzip / bgzip path
     const isBgzip = getBgzipBlockSize(raw, 0) > 0;
+
+    if (!isBgzip) {
+        // Standard gzip (possibly multi-stream/pigz) — decompress fully then parse as plain
+        const decompressed = await decompressGzipFull(raw);
+        await parseFastqPlain(decompressed, needId, onRead, onProgress);
+        return;
+    }
+
+    // BGZIP: process block by block
     let buffer = '', lineCount = 0, readCount = 0, offset = 0, memberCount = 0;
     let currentId = null, currentDesc = null;
 
     while (offset < raw.length) {
         if (raw[offset] !== 0x1f || raw[offset+1] !== 0x8b) break;
         memberCount++;
-        const blockSize = isBgzip ? getBgzipBlockSize(raw, offset) : raw.length - offset;
-        if (isBgzip && blockSize <= 0) break;
+        const blockSize = getBgzipBlockSize(raw, offset);
+        if (blockSize <= 0) break;
 
         const block = raw.subarray(offset, offset + blockSize);
         let decompressed;
         try { decompressed = pako.inflate(block); }
-        catch (e) {
-            if (!isBgzip && memberCount === 1) decompressed = pako.inflate(raw);
-            else throw new Error('Decompression failed: ' + e.message);
-        }
+        catch (e) { throw new Error('Decompression failed: ' + e.message); }
 
         buffer += new TextDecoder().decode(decompressed);
         const lines = buffer.split('\n');
@@ -889,7 +918,7 @@ async function parseFastq(file, needId, onRead, onProgress) {
             }
         }
 
-        offset += isBgzip ? blockSize : raw.length;
+        offset += blockSize;
 
         if (memberCount % 300 === 0 || memberCount === 1) {
             onProgress(offset / raw.length, readCount);
