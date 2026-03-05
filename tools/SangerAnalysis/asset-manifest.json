@@ -1,16 +1,16 @@
 {
   "files": {
     "main.css": "/tools/SangerAnalysis/static/css/main.e170c769.css",
-    "main.js": "/tools/SangerAnalysis/static/js/main.d650ab98.js",
+    "main.js": "/tools/SangerAnalysis/static/js/main.1ad54399.js",
     "static/js/453.68a3548e.chunk.js": "/tools/SangerAnalysis/static/js/453.68a3548e.chunk.js",
     "static/media/index.cjs": "/tools/SangerAnalysis/static/media/index.1c5a944c1f06f6511d01.cjs",
     "index.html": "/tools/SangerAnalysis/index.html",
     "main.e170c769.css.map": "/tools/SangerAnalysis/static/css/main.e170c769.css.map",
-    "main.d650ab98.js.map": "/tools/SangerAnalysis/static/js/main.d650ab98.js.map",
+    "main.1ad54399.js.map": "/tools/SangerAnalysis/static/js/main.1ad54399.js.map",
     "453.68a3548e.chunk.js.map": "/tools/SangerAnalysis/static/js/453.68a3548e.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.e170c769.css",
-    "static/js/main.d650ab98.js"
+    "static/js/main.1ad54399.js"
   ]
 }
