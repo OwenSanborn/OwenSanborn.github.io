@@ -188,6 +188,7 @@ const WebRAnalysis = () => {
           const anchor = "CCAATTAAA";
           const sequence = sangsFilt.map(s => s.baseCall).join('');
           console.log(`🧬 Full sequence length: ${sequence.length}`);
+          console.log(`🔍 Filtered sequence: ${sequence}`);
 
           // Try forward hairpin pattern first
           let useSequence = sequence;
