@@ -191,23 +191,17 @@ const WebRAnalysis = () => {
 
           let useSangsFilt = null;
           let orientation = null;
-          let anchorPos = -1;
+          let hairpinEnd = -1;
           let fwdError = null;
           let revError = null;
 
-          // Try forward first
+          // Try forward: find FWD hairpin, guide starts at hairpin_end + anchor_length
           const fwdMatch = sequence.match(FWD_HAIRPIN_PATTERN);
           if (fwdMatch) {
-            const fwdAnchorPos = sequence.indexOf(anchor);
-            if (fwdAnchorPos !== -1) {
-              console.log(`✅ Forward: hairpin at ${fwdMatch.index}, anchor at ${fwdAnchorPos}`);
-              orientation = 'forward';
-              useSangsFilt = sangsFilt;
-              anchorPos = fwdAnchorPos;
-            } else {
-              fwdError = 'forward hairpin found but anchor sequence not found';
-              console.warn(`⚠️ Forward hairpin found but no anchor in ${fileName}`);
-            }
+            console.log(`✅ Forward: hairpin at ${fwdMatch.index}`);
+            orientation = 'forward';
+            useSangsFilt = sangsFilt;
+            hairpinEnd = fwdMatch.index + fwdMatch[0].length;
           } else {
             fwdError = 'no forward hairpin pattern found';
             console.warn(`⚠️ No forward hairpin in ${fileName}`);
@@ -218,9 +212,10 @@ const WebRAnalysis = () => {
             const revMatch = sequence.match(REV_HAIRPIN_PATTERN);
             if (revMatch) {
               const rcSequence = reverseComplement(sequence);
-              const revAnchorPos = rcSequence.indexOf(anchor);
-              if (revAnchorPos !== -1) {
-                console.log(`🔄 Reverse: hairpin at ${revMatch.index}, anchor at ${revAnchorPos} in RC`);
+              // After RC, the reverse hairpin becomes the forward hairpin — re-find it
+              const fwdMatchInRC = rcSequence.match(FWD_HAIRPIN_PATTERN);
+              if (fwdMatchInRC) {
+                console.log(`🔄 Reverse: hairpin at ${fwdMatchInRC.index} in RC`);
                 orientation = 'reverse';
                 useSangsFilt = [...sangsFilt].reverse().map(s => ({
                   ...s,
@@ -234,13 +229,10 @@ const WebRAnalysis = () => {
                   gPerc: s.cPerc,
                   cPerc: s.gPerc
                 }));
-                anchorPos = revAnchorPos;
+                hairpinEnd = fwdMatchInRC.index + fwdMatchInRC[0].length;
               } else {
-                revError = 'reverse hairpin found but anchor sequence not found';
-                console.warn(`⚠️ Reverse hairpin found but no anchor in ${fileName}`);
-                console.log(`🔍 RC sequence (first 100): ${rcSequence.slice(0, 100)}`);
-                console.log(`🔍 Anchor in original FWD: ${sequence.indexOf(anchor)}`);
-                console.log(`🔍 RC of anchor (TTTAATTGG) in original: ${sequence.indexOf('TTTAATTGG')}`);
+                revError = 'reverse hairpin found but FWD hairpin not found in RC sequence';
+                console.warn(`⚠️ ${revError} for ${fileName}`);
               }
             } else {
               revError = 'no reverse hairpin pattern found';
@@ -261,10 +253,10 @@ const WebRAnalysis = () => {
             continue;
           }
 
-          console.log(`🎯 Anchor position: ${anchorPos} (orientation: ${orientation})`);
+          console.log(`🎯 Hairpin end: ${hairpinEnd} (orientation: ${orientation})`);
 
-          // Guide starts after anchor
-          const guideStartIdx = anchorPos + anchor.length;
+          // Guide starts after hairpin + anchor (anchor.length = 9 fixed offset)
+          const guideStartIdx = hairpinEnd + anchor.length;
           const guideLength = 36;
 
           // Target positions within guide (8, 13, 18, 23, 28, 33)
