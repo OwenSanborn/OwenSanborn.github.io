@@ -41,10 +41,10 @@ const reverseComplement = (seq) => {
 };
 
 // Hairpin patterns for validation
-// Forward: [TN][TN][AG][GN]A repeating (T positions, editing site, and G bleedover all allow N)
-const FWD_HAIRPIN_PATTERN = /TT[AGN]A[TN][TN][AGN][GN]A[TN][TN][AGN][GN]A[TN][TN][AGN][GN]A[TN][TN][AGN][GN]A[TN][TN][AGN][GN]A/;
-// Reverse: T[CN][TC][AN][AN] repeating (rev comp of [TN][TN][AG][GN]A)
-const REV_HAIRPIN_PATTERN = /T[CN][TC][AN][AN]T[CN][TC][AN][AN]T[CN][TC][AN][AN]T[CN][TC][AN][AN]T[CN][TC][AN][AN]T[CN][TC][AN][AN]/;
+// Forward: fixed prefix CAATTAAATT anchors the match, followed by repeating motif
+const FWD_HAIRPIN_PATTERN = /CAATTAAATT[AGN]A[TN][TN][AGN][GN]A[TN][TN][AGN][GN]A[TN][TN][AGN][GN]A[TN][TN][AGN][GN]A[TN][TN][AGN][GN]A/;
+// Reverse: fixed prefix AGGCCTGT anchors the match, followed by repeating motif
+const REV_HAIRPIN_PATTERN = /AGGCCTGT[CN][TC][AN][AN]T[CN][TC][AN][AN]T[CN][TC][AN][AN]T[CN][TC][AN][AN]T[CN][TC][AN][AN]T[CN][TC][AN][AN]/;
 
 const WebRAnalysis = () => {
   const [files, setFiles] = useState([]);
@@ -189,74 +189,66 @@ const WebRAnalysis = () => {
           const sequence = sangsFilt.map(s => s.baseCall).join('');
           console.log(`🧬 Full sequence length: ${sequence.length}`);
 
-          let useSangsFilt = null;
+          let useSangsFilt = sangsFilt;
+          let searchSequence = sequence;
           let orientation = null;
-          let hairpinEnd = -1;
-          let fwdError = null;
-          let revError = null;
 
-          // Try forward: find FWD hairpin, guide starts at hairpin_end + anchor_length
+          // Detect orientation via hairpin
           const fwdMatch = sequence.match(FWD_HAIRPIN_PATTERN);
           if (fwdMatch) {
-            console.log(`✅ Forward: hairpin at ${fwdMatch.index}`);
+            console.log(`✅ Forward hairpin at ${fwdMatch.index}`);
             orientation = 'forward';
-            useSangsFilt = sangsFilt;
-            hairpinEnd = fwdMatch.index + fwdMatch[0].length;
           } else {
-            fwdError = 'no forward hairpin pattern found';
-            console.warn(`⚠️ No forward hairpin in ${fileName}`);
-          }
-
-          // If forward failed, try reverse
-          if (!orientation) {
             const revMatch = sequence.match(REV_HAIRPIN_PATTERN);
             if (revMatch) {
-              const rcSequence = reverseComplement(sequence);
-              // After RC, the reverse hairpin becomes the forward hairpin — re-find it
-              const fwdMatchInRC = rcSequence.match(FWD_HAIRPIN_PATTERN);
-              if (fwdMatchInRC) {
-                console.log(`🔄 Reverse: hairpin at ${fwdMatchInRC.index} in RC`);
-                orientation = 'reverse';
-                useSangsFilt = [...sangsFilt].reverse().map(s => ({
-                  ...s,
-                  baseCall: reverseComplement(s.baseCall),
-                  aArea: s.tArea,
-                  tArea: s.aArea,
-                  gArea: s.cArea,
-                  cArea: s.gArea,
-                  aPerc: s.tPerc,
-                  tPerc: s.aPerc,
-                  gPerc: s.cPerc,
-                  cPerc: s.gPerc
-                }));
-                hairpinEnd = fwdMatchInRC.index + fwdMatchInRC[0].length;
-              } else {
-                revError = 'reverse hairpin found but FWD hairpin not found in RC sequence';
-                console.warn(`⚠️ ${revError} for ${fileName}`);
-              }
-            } else {
-              revError = 'no reverse hairpin pattern found';
-              console.warn(`⚠️ No reverse hairpin in ${fileName}`);
+              console.log(`🔄 Reverse hairpin at ${revMatch.index}, RC-ing sequence`);
+              orientation = 'reverse';
+              searchSequence = reverseComplement(sequence);
+              useSangsFilt = [...sangsFilt].reverse().map(s => ({
+                ...s,
+                baseCall: reverseComplement(s.baseCall),
+                aArea: s.tArea,
+                tArea: s.aArea,
+                gArea: s.cArea,
+                cArea: s.gArea,
+                aPerc: s.tPerc,
+                tPerc: s.aPerc,
+                gPerc: s.cPerc,
+                cPerc: s.gPerc
+              }));
             }
           }
 
           if (!orientation) {
-            const combinedError = [fwdError, revError].filter(Boolean).join('; ');
-            console.error(`❌ Both orientations failed for ${fileName}: ${combinedError}`);
+            console.error(`❌ No hairpin pattern found in ${fileName}`);
             results.push({
               file: fileName,
               group: group,
               replicate: replicate,
               value: null,
-              error: combinedError
+              error: 'No hairpin pattern found'
             });
             continue;
           }
 
-          console.log(`🎯 Hairpin end: ${hairpinEnd} (orientation: ${orientation})`);
+          // Find anchor to locate guide start
+          const anchorPos = searchSequence.indexOf(anchor);
+          console.log(`🎯 Anchor position: ${anchorPos} (orientation: ${orientation})`);
 
-          // Guide starts after hairpin + anchor (anchor.length = 9 fixed offset)
-          const guideStartIdx = hairpinEnd + anchor.length;
+          if (anchorPos === -1) {
+            console.error(`❌ Anchor not found in ${fileName} (${orientation})`);
+            results.push({
+              file: fileName,
+              group: group,
+              replicate: replicate,
+              value: null,
+              error: `Anchor not found (${orientation} orientation)`
+            });
+            continue;
+          }
+
+          // Guide starts immediately after anchor
+          const guideStartIdx = anchorPos + anchor.length;
           const guideLength = 36;
 
           // Target positions within guide (8, 13, 18, 23, 28, 33)
