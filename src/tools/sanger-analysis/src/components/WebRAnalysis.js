@@ -238,6 +238,9 @@ const WebRAnalysis = () => {
               } else {
                 revError = 'reverse hairpin found but anchor sequence not found';
                 console.warn(`⚠️ Reverse hairpin found but no anchor in ${fileName}`);
+                console.log(`🔍 RC sequence (first 100): ${rcSequence.slice(0, 100)}`);
+                console.log(`🔍 Anchor in original FWD: ${sequence.indexOf(anchor)}`);
+                console.log(`🔍 RC of anchor (TTTAATTGG) in original: ${sequence.indexOf('TTTAATTGG')}`);
               }
             } else {
               revError = 'no reverse hairpin pattern found';
