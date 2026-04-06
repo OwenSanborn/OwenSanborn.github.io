@@ -41,10 +41,10 @@ const reverseComplement = (seq) => {
 };
 
 // Hairpin patterns for validation
-// Forward: TT[AGN][GN]A repeating (TT fixed; editing site and bleedover allow N)
-const FWD_HAIRPIN_PATTERN = /TT[AGN][GN]ATT[AGN][GN]ATT[AGN][GN]ATT[AGN][GN]ATT[AGN][GN]ATT[AGN][GN]A/;
-// Reverse: T[CN][TCN]AA repeating (rev comp of TT[AGN][GN]A)
-const REV_HAIRPIN_PATTERN = /T[CN][TCN]AAT[CN][TCN]AAT[CN][TCN]AAT[CN][TCN]AAT[CN][TCN]AAT[CN][TCN]AA/;
+// Forward: [TN][TN][AG][GN]A repeating (T positions, editing site, and G bleedover all allow N)
+const FWD_HAIRPIN_PATTERN = /TT[AGN]A[TN][TN][AGN][GN]A[TN][TN][AGN][GN]A[TN][TN][AGN][GN]A[TN][TN][AGN][GN]A[TN][TN][AGN][GN]A/;
+// Reverse: T[CN][TC][AN][AN] repeating (rev comp of [TN][TN][AG][GN]A)
+const REV_HAIRPIN_PATTERN = /T[CN][TC][AN][AN]T[CN][TC][AN][AN]T[CN][TC][AN][AN]T[CN][TC][AN][AN]T[CN][TC][AN][AN]T[CN][TC][AN][AN]/;
 
 const WebRAnalysis = () => {
   const [files, setFiles] = useState([]);
@@ -68,17 +68,16 @@ const WebRAnalysis = () => {
     setFiles(validFiles);
     setMetadata(validFiles.map((file) => ({
       fileName: file.name,
-      group: '',
-      direction: 'fwd'
+      group: ''
     })));
     setError(null);
     setResults(null);
   };
 
   const handleMetadataChange = (index, field, value) => {
-    setMetadata(prev => prev.map((item, i) =>
-      i === index ? { ...item, [field]: value } : item
-    ));
+    const newMetadata = [...metadata];
+    newMetadata[index][field] = value;
+    setMetadata(newMetadata);
   };
 
   const processFiles = async () => {
@@ -96,19 +95,18 @@ const WebRAnalysis = () => {
       // Prepare group and replicate info
       const replicateCounts = {};
       const processedData = metadata.map((meta, idx) => {
-        const group = meta.group.trim() || 'default';
+        const group = meta.group.trim() || meta.fileName;
         replicateCounts[group] = (replicateCounts[group] || 0) + 1;
         return {
           file: files[idx],
           fileName: meta.fileName,
           group: group,
-          replicate: replicateCounts[group],
-          direction: meta.direction || 'fwd'
+          replicate: replicateCounts[group]
         };
       });
 
       for (let i = 0; i < processedData.length; i++) {
-        const { file, fileName, group, replicate, direction } = processedData[i];
+        const { file, fileName, group, replicate } = processedData[i];
 
         setProcessingStatus(`Reading ${fileName} (${i + 1}/${files.length})...`);
 
@@ -191,44 +189,76 @@ const WebRAnalysis = () => {
           const sequence = sangsFilt.map(s => s.baseCall).join('');
           console.log(`🧬 Full sequence length: ${sequence.length}`);
 
-          // Use explicit direction from metadata
-          let useSequence = sequence;
-          let useSangsFilt = sangsFilt;
-          const orientation = direction;
+          let useSangsFilt = null;
+          let orientation = null;
+          let anchorPos = -1;
+          let fwdError = null;
+          let revError = null;
 
-          if (direction === 'rev') {
-            console.log(`🔄 REV direction selected, reverse complementing sequence...`);
-            useSequence = reverseComplement(sequence);
-            useSangsFilt = [...sangsFilt].reverse().map(s => ({
-              ...s,
-              baseCall: reverseComplement(s.baseCall),
-              aArea: s.tArea,
-              tArea: s.aArea,
-              gArea: s.cArea,
-              cArea: s.gArea,
-              aPerc: s.tPerc,
-              tPerc: s.aPerc,
-              gPerc: s.cPerc,
-              cPerc: s.gPerc
-            }));
+          // Try forward first
+          const fwdMatch = sequence.match(FWD_HAIRPIN_PATTERN);
+          if (fwdMatch) {
+            const fwdAnchorPos = sequence.indexOf(anchor);
+            if (fwdAnchorPos !== -1) {
+              console.log(`✅ Forward: hairpin at ${fwdMatch.index}, anchor at ${fwdAnchorPos}`);
+              orientation = 'forward';
+              useSangsFilt = sangsFilt;
+              anchorPos = fwdAnchorPos;
+            } else {
+              fwdError = 'forward hairpin found but anchor sequence not found';
+              console.warn(`⚠️ Forward hairpin found but no anchor in ${fileName}`);
+            }
           } else {
-            console.log(`✅ FWD direction selected`);
+            fwdError = 'no forward hairpin pattern found';
+            console.warn(`⚠️ No forward hairpin in ${fileName}`);
           }
 
-          const anchorPos = useSequence.indexOf(anchor);
-          console.log(`🎯 Anchor position: ${anchorPos} (orientation: ${orientation})`);
+          // If forward failed, try reverse
+          if (!orientation) {
+            const revMatch = sequence.match(REV_HAIRPIN_PATTERN);
+            if (revMatch) {
+              const rcSequence = reverseComplement(sequence);
+              const revAnchorPos = rcSequence.indexOf(anchor);
+              if (revAnchorPos !== -1) {
+                console.log(`🔄 Reverse: hairpin at ${revMatch.index}, anchor at ${revAnchorPos} in RC`);
+                orientation = 'reverse';
+                useSangsFilt = [...sangsFilt].reverse().map(s => ({
+                  ...s,
+                  baseCall: reverseComplement(s.baseCall),
+                  aArea: s.tArea,
+                  tArea: s.aArea,
+                  gArea: s.cArea,
+                  cArea: s.gArea,
+                  aPerc: s.tPerc,
+                  tPerc: s.aPerc,
+                  gPerc: s.cPerc,
+                  cPerc: s.gPerc
+                }));
+                anchorPos = revAnchorPos;
+              } else {
+                revError = 'reverse hairpin found but anchor sequence not found';
+                console.warn(`⚠️ Reverse hairpin found but no anchor in ${fileName}`);
+              }
+            } else {
+              revError = 'no reverse hairpin pattern found';
+              console.warn(`⚠️ No reverse hairpin in ${fileName}`);
+            }
+          }
 
-          if (anchorPos === -1) {
-            console.error(`❌ Anchor not found in ${fileName} after ${orientation} orientation`);
+          if (!orientation) {
+            const combinedError = [fwdError, revError].filter(Boolean).join('; ');
+            console.error(`❌ Both orientations failed for ${fileName}: ${combinedError}`);
             results.push({
               file: fileName,
               group: group,
               replicate: replicate,
               value: null,
-              error: `Anchor sequence not found (${orientation} orientation)`
+              error: combinedError
             });
             continue;
           }
+
+          console.log(`🎯 Anchor position: ${anchorPos} (orientation: ${orientation})`);
 
           // Guide starts after anchor
           const guideStartIdx = anchorPos + anchor.length;
@@ -319,7 +349,7 @@ const WebRAnalysis = () => {
           }))
         ),
         type: 'scatter',
-        backgroundColor: '#000',
+        backgroundColor: '#FFFFFF',
         pointStyle: 'circle',
         radius: 4,
         order: 1
@@ -512,8 +542,8 @@ const WebRAnalysis = () => {
                 <tr>
                   <th style={{ color: '#E6EDF3', padding: '0.75rem', borderBottom: '1px solid rgba(107, 155, 209, 0.3)' }}>File</th>
                   <th style={{ color: '#E6EDF3', padding: '0.75rem', borderBottom: '1px solid rgba(107, 155, 209, 0.3)' }}>Group</th>
-                  <th style={{ color: '#E6EDF3', padding: '0.75rem', borderBottom: '1px solid rgba(107, 155, 209, 0.3)' }}>Direction</th>
                   <th style={{ color: '#E6EDF3', padding: '0.75rem', borderBottom: '1px solid rgba(107, 155, 209, 0.3)' }}>Replicate</th>
+                  <th style={{ color: '#E6EDF3', padding: '0.75rem', borderBottom: '1px solid rgba(107, 155, 209, 0.3)' }}>Orientation</th>
                   <th style={{ color: '#E6EDF3', padding: '0.75rem', borderBottom: '1px solid rgba(107, 155, 209, 0.3)' }}>% Editing</th>
                 </tr>
               </thead>
@@ -544,30 +574,14 @@ const WebRAnalysis = () => {
                           onChange={e => handleMetadataChange(idx, 'group', e.target.value)}
                         />
                       </td>
-                      <td style={{ padding: '0.5rem' }}>
-                        <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
-                          {['fwd', 'rev'].map(dir => (
-                            <button
-                              key={dir}
-                              onClick={() => handleMetadataChange(idx, 'direction', dir)}
-                              style={{
-                                padding: '3px 10px',
-                                borderRadius: '4px',
-                                border: 'none',
-                                cursor: 'pointer',
-                                fontWeight: '500',
-                                fontSize: '0.8rem',
-                                backgroundColor: meta.direction === dir ? '#6B9BD1' : '#2D2F3D',
-                                color: meta.direction === dir ? '#1A1B26' : '#A8B2D1',
-                                transition: 'all 0.2s'
-                              }}
-                            >
-                              {dir.toUpperCase()}
-                            </button>
-                          ))}
-                        </div>
-                      </td>
                       <td style={{ color: '#E6EDF3', padding: '0.5rem' }}>{result?.replicate || ''}</td>
+                      <td style={{
+                        color: hasError ? '#FF6B6B' : '#E6EDF3',
+                        padding: '0.5rem',
+                        fontSize: hasError ? '0.75rem' : 'inherit'
+                      }}>
+                        {hasError ? 'Error' : (result?.orientation || '')}
+                      </td>
                       <td style={{
                         color: hasError ? '#FF6B6B' : '#E6EDF3',
                         padding: '0.5rem'
@@ -602,8 +616,7 @@ const WebRAnalysis = () => {
           {/* Chart */}
           {results && (
             <div style={{
-              height: '100%',
-              minHeight: '500px',
+              height: '500px',
               backgroundColor: '#252733',
               padding: '1rem',
               borderRadius: '8px',
