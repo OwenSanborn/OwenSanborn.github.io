@@ -41,10 +41,12 @@ const reverseComplement = (seq) => {
 };
 
 // Hairpin patterns for validation
-// Forward: fixed prefix CAATTAAATT anchors the match, followed by repeating motif
-const FWD_HAIRPIN_PATTERN = /CAATTAAATT[AGN]A[TN][TN][AGN][GN]A[TN][TN][AGN][GN]A[TN][TN][AGN][GN]A[TN][TN][AGN][GN]A[TN][TN][AGN][GN]A/;
-// Reverse: fixed prefix AGGCCTGT anchors the match, followed by repeating motif
-const REV_HAIRPIN_PATTERN = /AGGCCTGT[CN][TC][AN][AN]T[CN][TC][AN][AN]T[CN][TC][AN][AN]T[CN][TC][AN][AN]T[CN][TC][AN][AN]T[CN][TC][AN][AN]/;
+// FWD repeat unit is TAGAT (5 chars), edit site = position 2 (first A): T-[A/G]-G-A-T
+// Prefix CCAATTAAA anchors the match, followed by 6x T[AGN]G[AN][TN]
+const FWD_HAIRPIN_PATTERN = /CCAATTAAAT[AGN]G[AN][TN]T[AGN]G[AN][TN]T[AGN]G[AN][TN]T[AGN]G[AN][TN]T[AGN]G[AN][TN]T[AGN]G[AN][TN]/;
+// REV repeat unit is ATCTA (RC of TAGAT), edit site RC = position 4: [AN][TN]C[TCN][AN]
+// Prefix AGGCCTGT anchors the match, followed by 6x [AN][TN]C[TCN][AN]
+const REV_HAIRPIN_PATTERN = /AGGCCTGT[AN][TN]C[TCN][AN][AN][TN]C[TCN][AN][AN][TN]C[TCN][AN][AN][TN]C[TCN][AN][AN][TN]C[TCN][AN][AN][TN]C[TCN][AN]/;
 
 const WebRAnalysis = () => {
   const [files, setFiles] = useState([]);
