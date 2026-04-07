@@ -41,12 +41,10 @@ const reverseComplement = (seq) => {
 };
 
 // Hairpin patterns for validation
-// FWD repeat unit is TAGAT (5 chars), edit site = position 2 (first A): T-[A/G]-G-A-T
-// Prefix CCAATTAAA anchors the match, followed by 6x T[AGN]G[AN][TN]
-const FWD_HAIRPIN_PATTERN = /CCAATTAAAT[AGN]G[AN][TN]T[AGN]G[AN][TN]T[AGN]G[AN][TN]T[AGN]G[AN][TN]T[AGN]G[AN][TN]T[AGN]G[AN][TN]/;
-// REV repeat unit is ATCTA (RC of TAGAT), edit site RC = position 4: [AN][TN]C[TCN][AN]
-// Prefix AGGCCTGT anchors the match, followed by 6x [AN][TN]C[TCN][AN]
-const REV_HAIRPIN_PATTERN = /AGGCCTGT[AN][TN]C[TCN][AN][AN][TN]C[TCN][AN][AN][TN]C[TCN][AN][AN][TN]C[TCN][AN][AN][TN]C[TCN][AN][AN][TN]C[TCN][AN]/;
+// Forward: TT[AGN][GN]A repeating (TT fixed; editing site and bleedover allow N)
+const FWD_HAIRPIN_PATTERN = /TT[AGN][GN]ATT[AGN][GN]ATT[AGN][GN]ATT[AGN][GN]ATT[AGN][GN]ATT[AGN][GN]A/;
+// Reverse: T[CN][TCN]AA repeating (rev comp of TT[AGN][GN]A)
+const REV_HAIRPIN_PATTERN = /T[CN][TCN]AAT[CN][TCN]AAT[CN][TCN]AAT[CN][TCN]AAT[CN][TCN]AAT[CN][TCN]AA/;
 
 const WebRAnalysis = () => {
   const [files, setFiles] = useState([]);
@@ -70,16 +68,17 @@ const WebRAnalysis = () => {
     setFiles(validFiles);
     setMetadata(validFiles.map((file) => ({
       fileName: file.name,
-      group: ''
+      group: '',
+      direction: 'fwd'
     })));
     setError(null);
     setResults(null);
   };
 
   const handleMetadataChange = (index, field, value) => {
-    const newMetadata = [...metadata];
-    newMetadata[index][field] = value;
-    setMetadata(newMetadata);
+    setMetadata(prev => prev.map((item, i) =>
+      i === index ? { ...item, [field]: value } : item
+    ));
   };
 
   const processFiles = async () => {
@@ -97,18 +96,19 @@ const WebRAnalysis = () => {
       // Prepare group and replicate info
       const replicateCounts = {};
       const processedData = metadata.map((meta, idx) => {
-        const group = meta.group.trim() || meta.fileName;
+        const group = meta.group.trim() || 'default';
         replicateCounts[group] = (replicateCounts[group] || 0) + 1;
         return {
           file: files[idx],
           fileName: meta.fileName,
           group: group,
-          replicate: replicateCounts[group]
+          replicate: replicateCounts[group],
+          direction: meta.direction || 'fwd'
         };
       });
 
       for (let i = 0; i < processedData.length; i++) {
-        const { file, fileName, group, replicate } = processedData[i];
+        const { file, fileName, group, replicate, direction } = processedData[i];
 
         setProcessingStatus(`Reading ${fileName} (${i + 1}/${files.length})...`);
 
@@ -191,65 +191,46 @@ const WebRAnalysis = () => {
           const sequence = sangsFilt.map(s => s.baseCall).join('');
           console.log(`🧬 Full sequence length: ${sequence.length}`);
 
+          // Use explicit direction from metadata
+          let useSequence = sequence;
           let useSangsFilt = sangsFilt;
-          let searchSequence = sequence;
-          let orientation = null;
+          const orientation = direction;
 
-          // Detect orientation via hairpin
-          const fwdMatch = sequence.match(FWD_HAIRPIN_PATTERN);
-          if (fwdMatch) {
-            console.log(`✅ Forward hairpin at ${fwdMatch.index}`);
-            orientation = 'forward';
+          if (direction === 'rev') {
+            console.log(`🔄 REV direction selected, reverse complementing sequence...`);
+            useSequence = reverseComplement(sequence);
+            useSangsFilt = [...sangsFilt].reverse().map(s => ({
+              ...s,
+              baseCall: reverseComplement(s.baseCall),
+              aArea: s.tArea,
+              tArea: s.aArea,
+              gArea: s.cArea,
+              cArea: s.gArea,
+              aPerc: s.tPerc,
+              tPerc: s.aPerc,
+              gPerc: s.cPerc,
+              cPerc: s.gPerc
+            }));
           } else {
-            const revMatch = sequence.match(REV_HAIRPIN_PATTERN);
-            if (revMatch) {
-              console.log(`🔄 Reverse hairpin at ${revMatch.index}, RC-ing sequence`);
-              orientation = 'reverse';
-              searchSequence = reverseComplement(sequence);
-              useSangsFilt = [...sangsFilt].reverse().map(s => ({
-                ...s,
-                baseCall: reverseComplement(s.baseCall),
-                aArea: s.tArea,
-                tArea: s.aArea,
-                gArea: s.cArea,
-                cArea: s.gArea,
-                aPerc: s.tPerc,
-                tPerc: s.aPerc,
-                gPerc: s.cPerc,
-                cPerc: s.gPerc
-              }));
-            }
+            console.log(`✅ FWD direction selected`);
           }
 
-          if (!orientation) {
-            console.error(`❌ No hairpin pattern found in ${fileName}`);
-            results.push({
-              file: fileName,
-              group: group,
-              replicate: replicate,
-              value: null,
-              error: 'No hairpin pattern found'
-            });
-            continue;
-          }
-
-          // Find anchor to locate guide start
-          const anchorPos = searchSequence.indexOf(anchor);
+          const anchorPos = useSequence.indexOf(anchor);
           console.log(`🎯 Anchor position: ${anchorPos} (orientation: ${orientation})`);
 
           if (anchorPos === -1) {
-            console.error(`❌ Anchor not found in ${fileName} (${orientation})`);
+            console.error(`❌ Anchor not found in ${fileName} after ${orientation} orientation`);
             results.push({
               file: fileName,
               group: group,
               replicate: replicate,
               value: null,
-              error: `Anchor not found (${orientation} orientation)`
+              error: `Anchor sequence not found (${orientation} orientation)`
             });
             continue;
           }
 
-          // Guide starts immediately after anchor
+          // Guide starts after anchor
           const guideStartIdx = anchorPos + anchor.length;
           const guideLength = 36;
 
@@ -338,7 +319,7 @@ const WebRAnalysis = () => {
           }))
         ),
         type: 'scatter',
-        backgroundColor: '#FFFFFF',
+        backgroundColor: '#000',
         pointStyle: 'circle',
         radius: 4,
         order: 1
@@ -531,8 +512,8 @@ const WebRAnalysis = () => {
                 <tr>
                   <th style={{ color: '#E6EDF3', padding: '0.75rem', borderBottom: '1px solid rgba(107, 155, 209, 0.3)' }}>File</th>
                   <th style={{ color: '#E6EDF3', padding: '0.75rem', borderBottom: '1px solid rgba(107, 155, 209, 0.3)' }}>Group</th>
+                  <th style={{ color: '#E6EDF3', padding: '0.75rem', borderBottom: '1px solid rgba(107, 155, 209, 0.3)' }}>Direction</th>
                   <th style={{ color: '#E6EDF3', padding: '0.75rem', borderBottom: '1px solid rgba(107, 155, 209, 0.3)' }}>Replicate</th>
-                  <th style={{ color: '#E6EDF3', padding: '0.75rem', borderBottom: '1px solid rgba(107, 155, 209, 0.3)' }}>Orientation</th>
                   <th style={{ color: '#E6EDF3', padding: '0.75rem', borderBottom: '1px solid rgba(107, 155, 209, 0.3)' }}>% Editing</th>
                 </tr>
               </thead>
@@ -563,14 +544,30 @@ const WebRAnalysis = () => {
                           onChange={e => handleMetadataChange(idx, 'group', e.target.value)}
                         />
                       </td>
-                      <td style={{ color: '#E6EDF3', padding: '0.5rem' }}>{result?.replicate || ''}</td>
-                      <td style={{
-                        color: hasError ? '#FF6B6B' : '#E6EDF3',
-                        padding: '0.5rem',
-                        fontSize: hasError ? '0.75rem' : 'inherit'
-                      }}>
-                        {hasError ? 'Error' : (result?.orientation || '')}
+                      <td style={{ padding: '0.5rem' }}>
+                        <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                          {['fwd', 'rev'].map(dir => (
+                            <button
+                              key={dir}
+                              onClick={() => handleMetadataChange(idx, 'direction', dir)}
+                              style={{
+                                padding: '3px 10px',
+                                borderRadius: '4px',
+                                border: 'none',
+                                cursor: 'pointer',
+                                fontWeight: '500',
+                                fontSize: '0.8rem',
+                                backgroundColor: meta.direction === dir ? '#6B9BD1' : '#2D2F3D',
+                                color: meta.direction === dir ? '#1A1B26' : '#A8B2D1',
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              {dir.toUpperCase()}
+                            </button>
+                          ))}
+                        </div>
                       </td>
+                      <td style={{ color: '#E6EDF3', padding: '0.5rem' }}>{result?.replicate || ''}</td>
                       <td style={{
                         color: hasError ? '#FF6B6B' : '#E6EDF3',
                         padding: '0.5rem'
@@ -605,7 +602,8 @@ const WebRAnalysis = () => {
           {/* Chart */}
           {results && (
             <div style={{
-              height: '500px',
+              height: '100%',
+              minHeight: '500px',
               backgroundColor: '#252733',
               padding: '1rem',
               borderRadius: '8px',
