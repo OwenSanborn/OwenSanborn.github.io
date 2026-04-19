@@ -5,8 +5,8 @@ export const publications = [
     authors: ["Sanborn, O.", "Cifuentes, D."],
     journal: "Genes and Development",
     year: 2025,
-    status: "Accepted in principle",
-    link: null,
+    status: "Published",
+    link: "https://pubmed.ncbi.nlm.nih.gov/41638910/",
   },
   {
     id: 2,
@@ -14,8 +14,8 @@ export const publications = [
     authors: ["Kretov, D. A.", "Sanborn, O.", "McIssac, T.", "Park, E.", "Imrat", "Wu, S.", "Cifuentes, D."],
     journal: "Molecular Cell",
     year: 2025,
-    status: "Accepted in principle",
-    link: null,
+    status: "Published",
+    link: "https://www.cell.com/molecular-cell/abstract/S1097-2765(26)00023-7",
   },
   {
     id: 3,
