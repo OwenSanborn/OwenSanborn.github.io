@@ -27,6 +27,19 @@ Verify with `curl -s https://owensanborn.github.io/<page>.html | grep <new text>
   To add a book, add an `<li><strong>Title</strong> by Author</li>` to the list.
   Favorites / least favorite are separate `<h2>` sections at the bottom.
 - Posts are listed on the site via `src/data/posts.js` (`slug` matches the filename).
+  They appear under "Reading Lists" at the bottom of the landing page.
+- The landing page shows a genre pie chart per year, driven by `src/data/books.js`
+  (title, author, genre; keyed by the post `slug`). **The HTML lists and `books.js` are
+  separate copies: when adding a book, add it to both**, tagged with one genre id from
+  the `genres` list at the top of that file.
+
+## Landing page layout
+
+Order (see `src/App.jsx`): Hero (name, title, tagline) → Tools → Experience →
+Publications → Contact → Reading Lists. The nav in `layout/StickyNav.jsx` mirrors it.
+Publications shows the first 3 authors + "et al." (always keeping `Sanborn, O.`
+visible); set `fullAuthorList: true` on a paper in `src/data/publications.js` to
+show everyone.
 
 ## Tools
 

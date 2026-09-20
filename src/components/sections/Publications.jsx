@@ -1,5 +1,25 @@
 import { publications } from '../../data/publications';
 
+const ME = 'Sanborn, O.';
+const SHOWN = 3;
+
+// Full list for papers flagged fullAuthorList; otherwise the first SHOWN authors
+// followed by "et al.", with Sanborn, O. kept visible if he'd be cut off.
+const formatAuthors = (pub) => {
+  const part = (text) => ({ text, bold: text === ME });
+  if (pub.fullAuthorList || pub.authors.length <= SHOWN + 1) {
+    return pub.authors.map(part);
+  }
+  const parts = pub.authors.slice(0, SHOWN).map(part);
+  const myIdx = pub.authors.indexOf(ME);
+  if (myIdx >= SHOWN) {
+    if (myIdx > SHOWN) parts.push({ text: '…', bold: false });
+    parts.push(part(ME));
+  }
+  if (myIdx !== pub.authors.length - 1) parts.push({ text: 'et al.', bold: false });
+  return parts;
+};
+
 const Publications = () => {
   return (
     <section id="publications" className="py-24 bg-charcoal">
@@ -25,14 +45,14 @@ const Publications = () => {
                 </h3>
               )}
               <p className="text-sm text-warm-grey font-light mb-2 leading-relaxed">
-                {pub.authors.map((author, idx) => (
+                {formatAuthors(pub).map((part, idx, parts) => (
                   <span key={idx}>
-                    {author === 'Sanborn, O.' ? (
-                      <strong className="text-ivory font-medium">{author}</strong>
+                    {part.bold ? (
+                      <strong className="text-ivory font-medium">{part.text}</strong>
                     ) : (
-                      author
+                      part.text
                     )}
-                    {idx < pub.authors.length - 1 && ', '}
+                    {idx < parts.length - 1 && ', '}
                   </span>
                 ))}
               </p>

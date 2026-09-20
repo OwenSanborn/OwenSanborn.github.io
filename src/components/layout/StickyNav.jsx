@@ -1,10 +1,10 @@
 const StickyNav = () => {
   const navItems = [
-    { name: 'Posts', href: '#posts' },
     { name: 'Tools', href: '#tools' },
     { name: 'Experience', href: '#experience' },
     { name: 'Publications', href: '#publications' },
     { name: 'Contact', href: '#contact' },
+    { name: 'Reading Lists', href: '#reading-lists' },
   ];
 
   return (

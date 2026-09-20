@@ -1,3 +1,5 @@
+// Set `fullAuthorList: true` to show every author; otherwise the site shows the
+// first 3 authors + "et al." (always keeping Sanborn, O. visible).
 export const publications = [
   {
     id: 1,
@@ -6,6 +8,7 @@ export const publications = [
     journal: "Genes and Development",
     year: 2025,
     status: "Published",
+    fullAuthorList: true,
     link: "https://pubmed.ncbi.nlm.nih.gov/41638910/",
   },
   {
@@ -15,6 +18,7 @@ export const publications = [
     journal: "Molecular Cell",
     year: 2025,
     status: "Published",
+    fullAuthorList: true,
     link: "https://www.cell.com/molecular-cell/abstract/S1097-2765(26)00023-7",
   },
   {

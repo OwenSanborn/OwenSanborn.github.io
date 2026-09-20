@@ -34,6 +34,18 @@ const Contact = () => {
                 owen-sanborn
               </a>
             </div>
+            <div className="flex items-center gap-4 text-warm-grey">
+              <span className="font-light text-sm w-20">Scholar</span>
+              <span className="text-warm-brown">—</span>
+              <a
+                href="https://scholar.google.com/citations?hl=en&user=8Bp5mLcAAAAJ"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-steel-blue hover:text-opacity-80 transition-colors font-light"
+              >
+                Google Scholar
+              </a>
+            </div>
           </div>
         </div>
       </div>
