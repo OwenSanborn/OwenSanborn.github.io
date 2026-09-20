@@ -21,6 +21,20 @@ const Tools = () => {
       link: "/tools/sequencing-depth/",
       external: false,
     },
+    {
+      id: 4,
+      name: "Library Pooling Calculator",
+      description: "Calculate pooling volumes for Illumina sequencing. Supports equal molar pooling and unequal pooling by target Gb output per library. Import from clipboard, export as PDF.",
+      link: "/tools/library-pooling/",
+      external: false,
+    },
+    {
+      id: 5,
+      name: "NGS Editing Analyzer",
+      description: "Analyze RNA editing from RBPscan NGS data. Upload FASTQ.gz files to extract motif IDs and hairpin editing counts. Supports paired-end mode (motif on R1, hairpin on reverse-complemented R2) and single-read mode. All processing done locally in your browser.",
+      link: "/tools/ngs-editing/",
+      external: false,
+    },
   ];
 
   return (
