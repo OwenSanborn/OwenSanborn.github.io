@@ -4,7 +4,7 @@ const ME = 'Sanborn, O.';
 const SHOWN = 3;
 
 // Full list for papers flagged fullAuthorList; otherwise the first SHOWN authors
-// followed by "et al.", with Sanborn, O. kept visible if he'd be cut off.
+// then "et al." and the last author, with Sanborn, O. kept visible if he'd be cut off.
 const formatAuthors = (pub) => {
   const part = (text) => ({ text, bold: text === ME });
   if (pub.fullAuthorList || pub.authors.length <= SHOWN + 1) {
@@ -16,7 +16,11 @@ const formatAuthors = (pub) => {
     if (myIdx > SHOWN) parts.push({ text: '…', bold: false });
     parts.push(part(ME));
   }
-  if (myIdx !== pub.authors.length - 1) parts.push({ text: 'et al.', bold: false });
+  // Senior (last) author stays visible after "et al." unless already shown.
+  const last = pub.authors[pub.authors.length - 1];
+  if (!parts.some((p) => p.text === last)) {
+    parts.push({ text: 'et al.', bold: false }, part(last));
+  }
   return parts;
 };
 

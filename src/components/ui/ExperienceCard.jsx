@@ -30,6 +30,19 @@ const ExperienceCard = ({ experience }) => {
       <p className="text-warm-grey font-light leading-relaxed text-sm">
         {experience.description}
       </p>
+
+      {experience.projects && (
+        <div className="mt-6 space-y-5">
+          {experience.projects.map((project) => (
+            <div key={project.title}>
+              <h4 className="text-sm text-ivory font-normal mb-1">{project.title}</h4>
+              <p className="text-warm-grey font-light leading-relaxed text-sm">
+                {project.description}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

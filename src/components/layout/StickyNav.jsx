@@ -3,8 +3,8 @@ const StickyNav = () => {
     { name: 'Tools', href: '#tools' },
     { name: 'Experience', href: '#experience' },
     { name: 'Publications', href: '#publications' },
-    { name: 'Contact', href: '#contact' },
     { name: 'Reading Lists', href: '#reading-lists' },
+    { name: 'Contact', href: '#contact' },
   ];
 
   return (

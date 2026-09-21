@@ -13,8 +13,8 @@ function App() {
       <Tools />
       <Experience />
       <Publications />
-      <Contact />
       <ReadingLists />
+      <Contact />
     </Layout>
   );
 }
